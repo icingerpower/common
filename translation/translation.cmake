@@ -1,0 +1,21 @@
+set(TRANSLATIONS_FILES
+    ${CMAKE_CURRENT_LIST_DIR}/ExceptionPasteTranslationError.h
+    ${CMAKE_CURRENT_LIST_DIR}/ExceptionPasteTranslationError.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/TranslationLinkManager.h
+    ${CMAKE_CURRENT_LIST_DIR}/TranslationLinkManager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ExceptionTextForTranslationEmpty.h
+    ${CMAKE_CURRENT_LIST_DIR}/ExceptionTextForTranslationEmpty.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/TranslatorManual.h
+    ${CMAKE_CURRENT_LIST_DIR}/TranslatorManual.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ExceptionTranslationNotDone.h
+    ${CMAKE_CURRENT_LIST_DIR}/ExceptionTranslationNotDone.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/TrTextManager.h
+    ${CMAKE_CURRENT_LIST_DIR}/TrTextManager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ExceptionTranslationSame.h
+    ${CMAKE_CURRENT_LIST_DIR}/ExceptionTranslationSame.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/TrZipManager.h
+    ${CMAKE_CURRENT_LIST_DIR}/TrZipManager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ExceptionTranslationSize.h
+    ${CMAKE_CURRENT_LIST_DIR}/ExceptionTranslationSize.cpp
+)
+
