@@ -19,6 +19,7 @@ void FFmpegCommands::createSlideshowVideo(
         int msec)
 {
     QDir tempDirFfmpeg(tempDir);
+    tempDirFfmpeg.mkpath(".");
     QList<QImage> images;
     int minWidth = 99999;
     int minHeight = 999999;
