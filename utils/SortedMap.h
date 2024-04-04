@@ -25,6 +25,7 @@ public:
     void clear();
     bool contains(const Key &key) const;
     T take(const Key &key);
+    const T &valueByRef(const Key &key) const;
     T &value(const Key &key);
     const T value(const Key &key,
                   const T &defaultValue = T()) const;
@@ -314,12 +315,14 @@ template<typename Key, typename T>
 const T SortedMap<Key, T>::value(
         const Key &key, const T &defaultValue) const
 {
-    T value = defaultValue;
-    if(m_hash.contains(key))
-    {
-        value = m_hash[key];
-    }
-    return value;
+    return m_hash.value(key, defaultValue);
+}
+//----------------------------------------------------------
+template<typename Key, typename T>
+const T &SortedMap<Key, T>::valueByRef(
+        const Key &key) const
+{
+    return m_hash.constFind(key).value();
 }
 //----------------------------------------------------------
 template<typename Key, typename T>
