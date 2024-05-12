@@ -339,7 +339,7 @@ QDataStream & operator >> (
 {
     QStringList keys1;
     stream >> keys1;
-    for (auto itKey1 = keys1.begin(); itKey1->end(); ++itKey1) {
+    for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1) {
         QStringList keys2;
         stream >> keys2;
         for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2) {
@@ -373,7 +373,7 @@ QDataStream & operator >> (
 {
     QStringList keys1;
     stream >> keys1;
-    for (auto itKey1 = keys1.begin(); itKey1->end(); ++itKey1) {
+    for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1) {
         QList<QDate> keys2;
         stream >> keys2;
         for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2) {
@@ -407,7 +407,7 @@ QDataStream & operator >> (
 {
     QStringList keys1;
     stream >> keys1;
-    for (auto itKey1 = keys1.begin(); itKey1->end(); ++itKey1) {
+    for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1) {
         QList<QDate> keys2;
         stream >> keys2;
         for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2) {
