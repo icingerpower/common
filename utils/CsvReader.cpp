@@ -172,6 +172,11 @@ bool CsvReader::readSomeLines(int nLines)
             stream.setCodec(m_encoding.toStdString().c_str());
         }
         #endif
+        while (m_linesToSkip - m_dataRode.skipedLines.size() > 0
+               && !stream.atEnd()) {
+            QString line = stream.readLine();
+            m_dataRode.skipedLines << line;
+        }
         QString line = stream.readLine();
         if (m_hasHeader) {
             QStringList headerElements = decodeLine(line);
@@ -433,5 +438,38 @@ void CsvReader::clear()
     m_dataRode.lines.clear();
     m_dataRode.skipedLines.clear();
     m_dataRode.header.clear();
+}
+
+QStringList CsvReader::readLastLine() const
+{
+    QStringList elements;
+    QFile file(m_fileName);
+    if (file.open(QIODevice::ReadOnly) && file.size() > 0) {
+
+        // Start from the end of the file and move backward
+        file.seek(file.size() - 1);
+        QByteArray lastLine;
+        char ch;
+
+        while (file.pos() > 0) {
+            file.read(&ch, 1);
+
+            if (ch == '\n' && lastLine.size() > 1) {
+                break;  // Reached the start of the last line
+            }
+
+            lastLine.prepend(ch);  // Prepend character to the result
+            file.seek(file.pos() - 2);  // Move one character back
+        }
+
+        // For the very last line (if no newline at the end of file)
+        if (file.pos() == 0) {
+            file.seek(0);
+            QByteArray firstLine = file.readLine();
+            lastLine.prepend(firstLine);
+        }
+        elements = decodeLine(QString::fromUtf8(lastLine));
+    }
+    return elements;
 }
 //----------------------------------------------------------

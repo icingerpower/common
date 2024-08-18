@@ -45,6 +45,7 @@ public:
     void removeFirstLine();
     QStringList takeFirstLine();
     void clear();
+    QStringList readLastLine() const;
 
     int linesToSkip() const;
     void setLinesToSkip(int linesToSkip);
