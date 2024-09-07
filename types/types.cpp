@@ -180,6 +180,27 @@ QDataStream & operator >> (
     return stream;
 }
 //----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QList<QHash<QString, QVariant>> &listOfHashOfStringVariant) {
+    stream << listOfHashOfStringVariant.size();
+    for (const auto &hash : listOfHashOfStringVariant)
+    {
+        stream << hash;
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QList<QHash<QString, QVariant>> &listOfHashOfStringVariant) {
+    int n = 0;
+    stream >> n;
+    for (int i = 0; i < n; ++i)
+    {
+        QHash<QString, QVariant> hash;
+        stream << hash;
+        listOfHashOfStringVariant << hash;
+    }
+    return stream;
+}
+//----------------------------------------
 QDataStream & operator << (
         QDataStream &stream,
         const QHash<QString, QHash<QString, double>> &hashOfHashDouble)
