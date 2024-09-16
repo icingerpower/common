@@ -180,6 +180,31 @@ QDataStream & operator >> (
     return stream;
 }
 //----------------------------------------
+QDataStream & operator << (
+        QDataStream &stream,
+        const QHash<QString, QDate> &hashOfStringDate) {
+    QStringList keys = hashOfStringDate.keys();
+    stream << keys;
+    for (auto itPair=hashOfStringDate.begin();
+         itPair!=hashOfStringDate.end(); ++itPair) {
+        stream << itPair.value();
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (
+        QDataStream &stream,
+        QHash<QString, QDate> &hashOfStringDate) {
+    QStringList keys;
+    stream >> keys;
+    for (auto itKey = keys.begin();
+         itKey != keys.end(); ++itKey) {
+        stream >> hashOfStringDate[*itKey];
+    }
+    return stream;
+}
+
+//----------------------------------------
 QDataStream & operator << (QDataStream &stream, const QList<QHash<QString, QVariant>> &listOfHashOfStringVariant) {
     stream << int(listOfHashOfStringVariant.size());
     for (const auto &hash : listOfHashOfStringVariant)
