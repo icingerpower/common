@@ -41,6 +41,7 @@ QDataStream & operator >> (
     return stream;
 }
 //----------------------------------------
+//----------------------------------------
 QDataStream & operator << (
         QDataStream &stream, const QList<QList<QVariant>> &listOfVariantList)
 {
@@ -78,6 +79,55 @@ QDataStream & operator >> (
     return stream;
 }
 //----------------------------------------
+//----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QList<QDate> &dates)
+{
+    stream << int(dates.size());
+    for (const auto &date : dates)
+    {
+        stream << date;
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QList<QDate> &dates)
+{
+    int nValues{0};
+    stream >> nValues;
+    QDate date;
+    for (int i=0; i<nValues; ++i)
+    {
+        stream >> date;
+        dates << date;
+    }
+    return stream;
+}
+//----------------------------------------
+//----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QMap<QDate, int> &mapDateInt)
+{
+    const QList<QDate> &dates = mapDateInt.keys();
+    stream << dates;
+    const auto &values = mapDateInt.values();
+    for (const auto &value : values)
+    {
+        stream << value;
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QMap<QDate, int> &mapDateInt)
+{
+    QList<QDate> dates;
+    stream >> dates;
+    for (const auto &date : dates)
+    {
+        stream >> mapDateInt[date];
+    }
+    return stream;
+}
+//----------------------------------------
+//----------------------------------------
 QDataStream & operator << (
         QDataStream &stream,
         const QSet<QString> &set)
@@ -105,6 +155,7 @@ QDataStream & operator >> (
     }
     return stream;
 }
+//----------------------------------------
 //----------------------------------------
 QDataStream & operator << (
         QDataStream &stream,
@@ -180,10 +231,11 @@ QDataStream & operator >> (
     return stream;
 }
 //----------------------------------------
+//----------------------------------------
 QDataStream & operator << (
         QDataStream &stream,
         const QHash<QString, QDate> &hashOfStringDate) {
-    QStringList keys = hashOfStringDate.keys();
+    const QStringList &keys = hashOfStringDate.keys();
     stream << keys;
     for (auto itPair=hashOfStringDate.begin();
          itPair!=hashOfStringDate.end(); ++itPair) {
@@ -203,7 +255,53 @@ QDataStream & operator >> (
     }
     return stream;
 }
-
+//----------------------------------------
+//----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QHash<QString, QMap<QDate, int>> &hashOfStringDateInt)
+{
+    const QStringList &keys = hashOfStringDateInt.keys();
+    stream << keys;
+    for (auto itPair=hashOfStringDateInt.begin();
+         itPair!=hashOfStringDateInt.end(); ++itPair) {
+        stream << itPair.value();
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QHash<QString, QMap<QDate, int>> &hashOfStringDateInt)
+{
+    QStringList keys;
+    stream >> keys;
+    for (const auto &key : keys)
+    {
+        stream >> hashOfStringDateInt[key];
+    }
+    return stream;
+}
+//----------------------------------------
+//----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QHash<QString, QList<QDate>> &hashOfStringListDate)
+{
+    const QStringList &keys = hashOfStringListDate.keys();
+    stream << keys;
+    for (auto itPair=hashOfStringListDate.begin();
+         itPair!=hashOfStringListDate.end(); ++itPair) {
+        stream << itPair.value();
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QHash<QString, QList<QDate>> &hashOfStringListDate)
+{
+    QStringList keys;
+    stream >> keys;
+    for (const auto &key : keys)
+    {
+        stream >> hashOfStringListDate[key];
+    }
+    return stream;
+}
+//----------------------------------------
 //----------------------------------------
 QDataStream & operator << (QDataStream &stream, const QList<QHash<QString, QVariant>> &listOfHashOfStringVariant) {
     stream << int(listOfHashOfStringVariant.size());
@@ -226,6 +324,7 @@ QDataStream & operator >> (QDataStream &stream,
     }
     return stream;
 }
+//----------------------------------------
 //----------------------------------------
 QDataStream & operator << (
         QDataStream &stream,

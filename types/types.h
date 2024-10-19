@@ -18,6 +18,12 @@ QDataStream & operator >> (QDataStream &stream, QList<QStringList> &listOfString
 QDataStream & operator << (QDataStream &stream, const QList<QList<QVariant>> &listOfVariantList);
 QDataStream & operator >> (QDataStream &stream, QList<QList<QVariant>> &listOfVariantList);
 
+QDataStream & operator << (QDataStream &stream, const QList<QDate> &dates);
+QDataStream & operator >> (QDataStream &stream, QList<QDate> &dates);
+
+QDataStream & operator << (QDataStream &stream, const QMap<QDate, int> &mapDateInt);
+QDataStream & operator >> (QDataStream &stream, QMap<QDate, int> &mapDateInt);
+
 QDataStream & operator << (QDataStream &stream, const QSet<QString> &set);
 QDataStream & operator >> (QDataStream &stream, QSet<QString> &set);
 
@@ -32,6 +38,12 @@ QDataStream & operator >> (QDataStream &stream, QHash<QString, QVariant> &hashOf
 
 QDataStream & operator << (QDataStream &stream, const QHash<QString, QDate> &hashOfStringDate);
 QDataStream & operator >> (QDataStream &stream, QHash<QString, QDate> &hashOfStringDate);
+
+QDataStream & operator << (QDataStream &stream, const QHash<QString, QMap<QDate, int>> &hashOfStringDateInt);
+QDataStream & operator >> (QDataStream &stream, QHash<QString, QMap<QDate, int>> &hashOfStringDateInt);
+
+QDataStream & operator << (QDataStream &stream, const QHash<QString, QList<QDate>> &hashOfStringListDate);
+QDataStream & operator >> (QDataStream &stream, QHash<QString, QList<QDate>> &hashOfStringListDate);
 
 QDataStream & operator << (QDataStream &stream, const QList<QHash<QString, QVariant>> &listOfHashOfStringVariant);
 QDataStream & operator >> (QDataStream &stream, QList<QHash<QString, QVariant>> &listOfHashOfStringVariant);
