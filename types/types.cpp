@@ -134,9 +134,8 @@ QDataStream & operator << (
 {
     int nElements = set.size();
     stream << QString::number(nElements);
-    for (auto itElement=set.begin();
-         itElement!=set.end(); ++itElement) {
-        stream << *itElement;
+    for (const auto &string : set) {
+        stream << string;
     }
     return stream;
 }
