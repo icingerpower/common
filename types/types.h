@@ -7,6 +7,7 @@
 #include <QSet>
 #include <QHash>
 #include <QDate>
+#include <QSize>
 
 inline void initTypes(){
     qRegisterMetaType<QList<QStringList>>();
@@ -17,6 +18,9 @@ QDataStream & operator >> (QDataStream &stream, QList<QStringList> &listOfString
 
 QDataStream & operator << (QDataStream &stream, const QList<QList<QVariant>> &listOfVariantList);
 QDataStream & operator >> (QDataStream &stream, QList<QList<QVariant>> &listOfVariantList);
+
+QDataStream & operator << (QDataStream &stream, const QList<QSize> &sizes);
+QDataStream & operator >> (QDataStream &stream, QList<QSize> &sizes);
 
 QDataStream & operator << (QDataStream &stream, const QList<QDate> &dates);
 QDataStream & operator >> (QDataStream &stream, QList<QDate> &dates);

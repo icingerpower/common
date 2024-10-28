@@ -80,6 +80,34 @@ QDataStream & operator >> (
 }
 //----------------------------------------
 //----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QList<QSize> &sizes)
+{
+    stream << int(sizes.size());
+    for (const auto &size : sizes)
+    {
+        stream << size.width();
+        stream << size.height();
+    }
+    return stream;
+
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QList<QSize> &sizes)
+{
+    int nValues{0};
+    stream >> nValues;
+    int width{0};
+    int height{0};
+    for (int i=0; i<nValues; ++i)
+    {
+        stream >> width;
+        stream >> height;
+        sizes << QSize{width, height};
+    }
+    return stream;
+}
+//----------------------------------------
+//----------------------------------------
 QDataStream & operator << (QDataStream &stream, const QList<QDate> &dates)
 {
     stream << int(dates.size());
