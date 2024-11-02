@@ -3,7 +3,8 @@
 
 #include <QDir>
 #include <QLocale>
-#include <QRandomGenerator>
+#include <QSharedPointer>
+#include <QSettings>
 
 
 class WorkingDirectoryManager
@@ -13,6 +14,7 @@ public:
     static QString KEY_RECENT;
     ~WorkingDirectoryManager();
     static WorkingDirectoryManager *instance();
+    QSharedPointer<QSettings> settings() const;
     QStringList recentlyOpen();
     QString settingFilePath() const;
     void open(const QString &dir);

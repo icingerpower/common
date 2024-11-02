@@ -20,6 +20,12 @@ WorkingDirectoryManager *WorkingDirectoryManager::instance()
     return &instance;
 }
 //----------------------------------------
+QSharedPointer<QSettings> WorkingDirectoryManager::settings() const
+{
+    return QSharedPointer<QSettings>{new QSettings{settingFilePath(),
+                                                   QSettings::IniFormat}};
+}
+//----------------------------------------
 QStringList WorkingDirectoryManager::recentlyOpen()
 {
     QStringList dirs;
