@@ -47,6 +47,11 @@ bool DialogOpenConfig::wasRejected() const
     return m_rejected;
 }
 //----------------------------------------
+bool DialogOpenConfig::wasAccepted() const
+{
+    return !m_rejected;
+}
+//----------------------------------------
 void DialogOpenConfig::clearRecentSelected()
 {
     auto selectedItems = ui->listRecentPaths->selectedItems();

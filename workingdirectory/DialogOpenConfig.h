@@ -15,6 +15,7 @@ public:
     explicit DialogOpenConfig(QWidget *parent = nullptr);
     ~DialogOpenConfig();
     bool wasRejected() const;
+    bool wasAccepted() const;
 
 public slots:
     void clearRecentSelected();

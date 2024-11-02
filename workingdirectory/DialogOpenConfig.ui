@@ -88,13 +88,6 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="buttonCreate">
-       <property name="text">
-        <string>Create</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QPushButton" name="buttonClose">
        <property name="text">
         <string>Close</string>
@@ -107,22 +100,6 @@
  </widget>
  <resources/>
  <connections>
-  <connection>
-   <sender>buttonCreate</sender>
-   <signal>clicked()</signal>
-   <receiver>DialogOpenConifg</receiver>
-   <slot>accept()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>722</x>
-     <y>640</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>539</x>
-     <y>720</y>
-    </hint>
-   </hints>
-  </connection>
   <connection>
    <sender>buttonClose</sender>
    <signal>clicked()</signal>
