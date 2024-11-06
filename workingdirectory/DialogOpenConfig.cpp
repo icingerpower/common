@@ -95,7 +95,8 @@ void DialogOpenConfig::browseAndOpen()
     QString dirPath = QFileDialog::getExistingDirectory(
                 this,
                 tr("Chose a directory"),
-                lastDirPath);
+                lastDirPath,
+                QFileDialog::DontUseNativeDialog);
     if (!dirPath.isEmpty()) {
         settings.setValue(settingKey, QFileInfo(dirPath).path());
         WorkingDirectoryManager::instance()->open(dirPath);

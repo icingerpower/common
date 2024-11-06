@@ -1,4 +1,6 @@
 #include <QSettings>
+#include <QApplication>
+#include <QPalette>
 
 #include "WorkingDirectoryManager.h"
 
@@ -119,5 +121,54 @@ void WorkingDirectoryManager::removeFile(
     dir.cd(folderName);
     QString filePath = dir.filePath(fileName);
     QFile::remove(filePath);
+}
+//----------------------------------------
+void WorkingDirectoryManager::installDarkPalette()
+{
+    QColor darkColor{53, 53, 53};
+    QColor darkerColor{25, 25, 25};
+    QColor modernBlue(104,144,236);
+    QPalette palette;
+    palette.setColor(QPalette::Window, darkColor);
+    palette.setColor(QPalette::WindowText, Qt::white);
+    palette.setColor(QPalette::Base, darkerColor);
+    palette.setColor(QPalette::AlternateBase,
+                     darkColor);
+    palette.setColor(QPalette::ToolTipBase, darkerColor);
+    palette.setColor(QPalette::ToolTipText, Qt::white);
+    palette.setColor(QPalette::Text, Qt::white);
+    palette.setColor(QPalette::Button, darkColor);
+    palette.setColor(QPalette::ButtonText, Qt::white);
+    palette.setColor(QPalette::BrightText, Qt::red);
+    palette.setColor(QPalette::Highlight, modernBlue);
+    palette.setColor(QPalette::HighlightedText, Qt::black);
+    palette.setColor(QPalette::Disabled,
+                     QPalette::Text, Qt::lightGray);
+    palette.setColor(QPalette::Disabled,
+                     QPalette::ButtonText, Qt::lightGray);
+    palette.setColor(QPalette::Disabled,
+                     QPalette::WindowText, Qt::lightGray);
+    static_cast<QApplication*>(QApplication::instance())->setPalette(
+                palette);
+}
+//----------------------------------------
+void WorkingDirectoryManager::installDarkOrangePalette()
+{
+    installDarkPalette();
+    QApplication *app = static_cast<QApplication*>(QApplication::instance());
+    QPalette palette = app->palette();
+    QColor modernOrange(236,163,104);
+    palette.setColor(QPalette::Highlight, modernOrange);
+    app->setPalette(palette);
+}
+//----------------------------------------
+void WorkingDirectoryManager::installDarkBluePalette()
+{
+    installDarkPalette();
+    QApplication *app = static_cast<QApplication*>(QApplication::instance());
+    QPalette palette = app->palette();
+    QColor modernBlue(104,144,236);
+    palette.setColor(QPalette::Highlight, modernBlue);
+    app->setPalette(palette);
 }
 //----------------------------------------

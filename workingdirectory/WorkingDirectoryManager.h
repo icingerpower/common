@@ -28,6 +28,10 @@ public:
     void removeFile(const QString &folderName, const QString &fileName);
     QString workingDirName() const;
 
+    void installDarkPalette();
+    void installDarkOrangePalette();
+    void installDarkBluePalette();
+
 protected:
     WorkingDirectoryManager();
     QDir m_workingDir;
