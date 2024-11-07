@@ -125,8 +125,10 @@ void WorkingDirectoryManager::removeFile(
 //----------------------------------------
 void WorkingDirectoryManager::installDarkPalette()
 {
-    QColor darkColor{53, 53, 53};
-    QColor darkerColor{25, 25, 25};
+    //QColor darkColor{53, 53, 53};
+    //QColor darkerColor{25, 25, 25};
+    QColor darkColor{66, 67, 68};
+    QColor darkerColor{46, 47, 48};
     QColor modernBlue(104,144,236);
     QPalette palette;
     palette.setColor(QPalette::Window, darkColor);
