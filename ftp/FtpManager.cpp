@@ -161,6 +161,7 @@ void FtpManager::_runProcess(const QStringList &arguments)
 #else
     QString program("curl-7.85.0_9-win64-mingw/bin/curl.exe");
 #endif
+    qDebug() << program << arguments.join(" ");
     auto process = new QProcess;
     connect(process,
             &QProcess::errorOccurred,

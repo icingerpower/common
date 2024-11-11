@@ -13,8 +13,12 @@ public:
     void setError(const QString &error);
 
 
+    const QString &title() const;
+    void setTitle(const QString &newTitle);
+
 private:
     QString m_error;
+    QString m_title;
 };
 
 #endif // EXCEPTIONTRANSLATIONSIZE_H

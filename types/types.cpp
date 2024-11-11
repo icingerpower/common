@@ -19,7 +19,6 @@ QDataStream & operator << (
     }
     return stream;
 }
-
 //----------------------------------------
 QDataStream & operator >> (
         QDataStream &stream, QList<QStringList> &listOfStringList)
