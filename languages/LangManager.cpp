@@ -3,8 +3,6 @@
 
 #include "LangManager.h"
 
-//const QString LangManager::KEY_SETTINGS_LANGS{"transLangs"};
-
 const QHash<QString, QString> LangManager::COUNTRY_TO_LANG{
     {"com","en"}
     , {"uk","en"}
