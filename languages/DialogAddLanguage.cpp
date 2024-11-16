@@ -1,18 +1,18 @@
 #include <QLocale>
 
-#include "DialogPickLanguage.h"
-#include "ui_DialogPickLanguage.h"
+#include "DialogAddLanguage.h"
+#include "ui_DialogAddLanguage.h"
 
-DialogPickLanguage::DialogPickLanguage(QWidget *parent) :
+DialogAddLanguage::DialogAddLanguage(QWidget *parent) :
     QDialog(parent),
-    ui(new Ui::DialogPickLanguage)
+    ui(new Ui::DialogAddLanguage)
 {
     ui->setupUi(this);
     _loadLangages();
     _connectSlots();
 }
 
-void DialogPickLanguage::_loadLangages()
+void DialogAddLanguage::_loadLangages()
 {
     QSet<QString> codesDone;
     for (int i = QLocale::C + 1; i <= QLocale::LastLanguage; ++i) {
@@ -33,24 +33,24 @@ void DialogPickLanguage::_loadLangages()
     }
 }
 
-void DialogPickLanguage::_connectSlots()
+void DialogAddLanguage::_connectSlots()
 {
     connect(ui->buttonFilter,
             &QPushButton::clicked,
             this,
-            &DialogPickLanguage::filter);
+            &DialogAddLanguage::filter);
     connect(ui->buttonFilterReset,
             &QPushButton::clicked,
             this,
-            &DialogPickLanguage::filterReset);
+            &DialogAddLanguage::filterReset);
 }
 
-DialogPickLanguage::~DialogPickLanguage()
+DialogAddLanguage::~DialogAddLanguage()
 {
     delete ui;
 }
 
-QString DialogPickLanguage::getLangCode() const
+QString DialogAddLanguage::getLangCode() const
 {
     const auto &selItems = ui->tableWidgetLangs->selectedItems();
     if (selItems.size() > 0)
@@ -60,7 +60,7 @@ QString DialogPickLanguage::getLangCode() const
     return QString{};
 }
 
-QString DialogPickLanguage::getLangName() const
+QString DialogAddLanguage::getLangName() const
 {
     const auto &selItems = ui->tableWidgetLangs->selectedItems();
     if (selItems.size() > 0)
@@ -70,7 +70,7 @@ QString DialogPickLanguage::getLangName() const
     return QString{};
 }
 
-void DialogPickLanguage::filter()
+void DialogAddLanguage::filter()
 {
     ui->tableWidgetLangs->clearSelection();
     const QString &textFilter = ui->lineEditFilter->text();
@@ -83,7 +83,7 @@ void DialogPickLanguage::filter()
     }
 }
 
-void DialogPickLanguage::filterReset()
+void DialogAddLanguage::filterReset()
 {
     int nRows = ui->tableWidgetLangs->rowCount();
     for (int i=0; i<nRows; ++i)
