@@ -26,6 +26,13 @@ QString TrSqlManager::nameDataBase(const QString &langFrom) const
 
 QString TrSqlManager::filePathDataBase(const QString &langFrom) const
 {
+    const auto &fileInfo = m_workingDirectory.entryInfoList(
+                QStringList{QString{"translations_%1*db"}.arg(langFrom)},
+                QDir::Files, QDir::Name);
+    if (fileInfo.size() > 0)
+    {
+        return fileInfo.last().absoluteFilePath();
+    }
     return m_workingDirectory.filePath(nameDataBase(langFrom));
 }
 
