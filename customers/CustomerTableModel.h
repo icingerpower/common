@@ -7,11 +7,16 @@
 
 #include "Customer.h"
 
+#define REGISTER_CUSTOMER_META_TYPES \
+    qRegisterMetaType<QList<QHash<QString, QVariant>>>(); \
+    qRegisterMetaType<QHash<QString, QDate>>();
+
 class CustomerTableModel : public QAbstractTableModel
 {
     Q_OBJECT
 
 public:
+    static QString KEY_SETTINGS_CUSTOMER_MAC_ADDRESSES;
     explicit CustomerTableModel(const QString &settingsFilePath,
                                 const QString &settingsFilePathSecret,
                                 QObject *parent = nullptr);
@@ -57,7 +62,6 @@ private:
     void saveInSettings();
     void loadFromSettings();
     static QString KEY_SETTINGS_CUSTOMERS;
-    static QString KEY_SETTINGS_CUSTOMER_MAC_ADDRESSES;
     void _connectCustomer(Customer *customer);
     QString m_settingsFilePath;
     QString m_settingsFilePathSecret;

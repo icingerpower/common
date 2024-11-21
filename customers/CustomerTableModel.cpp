@@ -215,6 +215,7 @@ Qt::ItemFlags CustomerTableModel::flags(const QModelIndex &index) const
 QHash<QString, QDate> CustomerTableModel::readMacAddresses() const
 {
     QSettings settings{m_settingsFilePath, QSettings::IniFormat};
+    bool continas = settings.contains(KEY_SETTINGS_CUSTOMER_MAC_ADDRESSES);
     return settings.value(
                 KEY_SETTINGS_CUSTOMER_MAC_ADDRESSES,
                 QVariant::fromValue(QHash<QString, QDate>{})).value<QHash<QString, QDate>>();
