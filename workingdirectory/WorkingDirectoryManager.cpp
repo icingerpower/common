@@ -25,7 +25,7 @@ WorkingDirectoryManager *WorkingDirectoryManager::instance()
 //----------------------------------------
 QSharedPointer<QSettings> WorkingDirectoryManager::settings() const
 {
-    return QSharedPointer<QSettings>{new QSettings{settingFilePath(),
+    return QSharedPointer<QSettings>{new QSettings{settingsFilePath(),
                                                    QSettings::IniFormat}};
 }
 //----------------------------------------
@@ -39,9 +39,14 @@ QStringList WorkingDirectoryManager::recentlyOpen()
     return dirs;
 }
 //----------------------------------------
-QString WorkingDirectoryManager::settingFilePath() const
+QString WorkingDirectoryManager::settingsFilePath() const
 {
     return m_workingDir.filePath("settings.ini");
+}
+//----------------------------------------
+QString WorkingDirectoryManager::settingsFilePathUnexportable() const
+{
+    return m_workingDir.filePath("settingsNoExport.ini");
 }
 //----------------------------------------
 void WorkingDirectoryManager::open(const QString &dir)

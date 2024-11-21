@@ -1,0 +1,19 @@
+set(CUSTOMERS_FILES
+        ${CMAKE_CURRENT_LIST_DIR}/Customer.h
+        ${CMAKE_CURRENT_LIST_DIR}/Customer.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/CustomerTableModel.h
+        ${CMAKE_CURRENT_LIST_DIR}/CustomerTableModel.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/DialogEditCustomer.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/DialogEditCustomer.h
+        ${CMAKE_CURRENT_LIST_DIR}/DialogEditCustomer.ui
+        ${CMAKE_CURRENT_LIST_DIR}/PaneSettingsCustomers.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/PaneSettingsCustomers.h
+        ${CMAKE_CURRENT_LIST_DIR}/PaneSettingsCustomers.ui
+        ${CMAKE_CURRENT_LIST_DIR}/DialogLicenceToRenew.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/DialogLicenceToRenew.h
+        ${CMAKE_CURRENT_LIST_DIR}/DialogLicenceToRenew.ui
+        ${CMAKE_CURRENT_LIST_DIR}/DialogNoLicence.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/DialogNoLicence.h
+        ${CMAKE_CURRENT_LIST_DIR}/DialogNoLicence.ui
+)
+
