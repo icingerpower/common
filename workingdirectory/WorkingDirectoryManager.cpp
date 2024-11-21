@@ -7,6 +7,7 @@
 //----------------------------------------
 int WorkingDirectoryManager::N_RECENT_MAX = 10;
 QString WorkingDirectoryManager::KEY_RECENT = "recents-";
+const QString WorkingDirectoryManager::KEY_LANGAGE_SEL{"LangageSel"};
 //----------------------------------------
 WorkingDirectoryManager::WorkingDirectoryManager()
 {

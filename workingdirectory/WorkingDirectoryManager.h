@@ -12,6 +12,7 @@ class WorkingDirectoryManager
 public:
     static int N_RECENT_MAX;
     static QString KEY_RECENT;
+    static const QString KEY_LANGAGE_SEL;
     ~WorkingDirectoryManager();
     static WorkingDirectoryManager *instance();
     QSharedPointer<QSettings> settings() const;
