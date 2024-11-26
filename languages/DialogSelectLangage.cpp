@@ -17,20 +17,21 @@ DialogSelectLangage::DialogSelectLangage(QWidget *parent) :
     LangManager langManager;
     int indexToSel = -1;
     const auto &langCodes = langManager.langCodesTo();
+    QString languageNameToSel;
     if (langCodes.size() > 0)
     {
         for (int i=0; i<langCodes.size(); ++i)
         {
+            auto language = QLocale::codeToLanguage(langCodes[i]);
+            const auto &languageName = QLocale::languageToString(language).trimmed();
             if (langCodes[i].compare(langCodeLocale, Qt::CaseInsensitive) == 0)
             {
-                indexToSel = i;
+                languageNameToSel = languageName;
             }
             else if (langCodes[i].compare("en", Qt::CaseInsensitive) == 0 && indexToSel == -1)
             {
-                indexToSel = i;
+                languageNameToSel = languageName;
             }
-            auto language = QLocale::codeToLanguage(langCodes[i]);
-            const auto &languageName = QLocale::languageToString(language).trimmed();
             auto item = new QListWidgetItem{languageName};
             item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
             item->setData(Qt::TextAlignmentRole, Qt::AlignCenter);
@@ -40,9 +41,17 @@ DialogSelectLangage::DialogSelectLangage(QWidget *parent) :
             ui->listWidgetLangs->setFont(font);
             m_languagesToCode[languageName] = langCodes[i];
         }
-        if (indexToSel > -1)
+        if (!languageNameToSel.isEmpty())
         {
-            ui->listWidgetLangs->setCurrentRow(indexToSel);
+            for (int i=0; i<langCodes.size(); ++i)
+            {
+                if (ui->listWidgetLangs->item(i)->text() == languageNameToSel)
+                {
+                    indexToSel = i;
+                    ui->listWidgetLangs->setCurrentRow(indexToSel);
+                    break;
+                }
+            }
         }
     }
 }
