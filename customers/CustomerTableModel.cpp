@@ -180,7 +180,6 @@ QVariant CustomerTableModel::data(const QModelIndex &index, int role) const
         auto value = m_colInfos[index.column()].funcValue(*m_customers[index.row()]);
         if (value.typeId() == boolTypeId)
         {
-            qDebug() << "ok4";
             return value.toBool() ? Qt::Checked : Qt::Unchecked;
         }
     }
