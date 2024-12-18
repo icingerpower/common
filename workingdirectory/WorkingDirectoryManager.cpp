@@ -1,6 +1,7 @@
 #include <QSettings>
 #include <QApplication>
 #include <QPalette>
+#include <QStyleFactory>
 
 #include "WorkingDirectoryManager.h"
 
@@ -133,6 +134,7 @@ void WorkingDirectoryManager::installDarkPalette()
 {
     //QColor darkColor{53, 53, 53};
     //QColor darkerColor{25, 25, 25};
+    QApplication::setStyle(QStyleFactory::create("Fusion"));
     QColor darkColor{66, 67, 68};
     QColor darkerColor{46, 47, 48};
     QColor modernBlue(104,144,236);
