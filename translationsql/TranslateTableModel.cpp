@@ -114,7 +114,7 @@ void TranslateTableModel::pasteTranslatedText(
                 {
                     nSame = 0;
                 }
-                if (nSame == 10)
+                if (nSame == 20)
                 {
                     ExceptionTranslation exception;
                     exception.setTitle(tr("Missing translations"));
