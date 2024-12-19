@@ -78,7 +78,21 @@ QStringList TranslateTableModel::getLangCodes() const
 void TranslateTableModel::pasteTranslatedText(
         const QModelIndex &index, const QStringList &lines, bool force)
 {
-    const QString &langTo = m_header[index.column()];
+    const QString &langTo = m_header[index.column()].toLower();
+    QSet<QString> countriesWithEnglish{"se", "pl", "nl", "sg"};
+    int nSameMax = 17;
+    int percentageSameMax = PERCENTAGE_TRANS_SAME;
+    if (countriesWithEnglish.contains(langTo))
+    {
+        nSameMax = 30;
+        percentageSameMax = 85;
+    }
+    if (QFile::exists("transparams.ini"))
+    {
+        QSettings settings("transparams.ini", QSettings::IniFormat);
+        nSameMax = settings.value("nSameMax", nSameMax).toInt();
+        percentageSameMax = settings.value("percentageSameMax", percentageSameMax).toInt();
+    }
     if (index.column() == 0)
     {
         ExceptionTranslation exception;
@@ -114,7 +128,7 @@ void TranslateTableModel::pasteTranslatedText(
                 {
                     nSame = 0;
                 }
-                if (nSame == 20)
+                if (nSame == nSameMax)
                 {
                     ExceptionTranslation exception;
                     exception.setTitle(tr("Missing translations"));
@@ -143,7 +157,7 @@ void TranslateTableModel::pasteTranslatedText(
             }
             // TODO check translation is not same with another column
             int countSameAsOtherColumn = _countNumberSameAsAlreadyPasted(lines);
-            if (countSameAsOtherColumn > lines.size() * PERCENTAGE_TRANS_SAME / 100.)
+            if (countSameAsOtherColumn > lines.size() * percentageSameMax / 100.)
             {
                 ExceptionTranslation exception;
                 exception.setTitle("Translations are the same as another column");
