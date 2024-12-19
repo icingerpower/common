@@ -79,10 +79,9 @@ void TranslateTableModel::pasteTranslatedText(
         const QModelIndex &index, const QStringList &lines, bool force)
 {
     const QString &langTo = m_header[index.column()].toLower();
-    QSet<QString> countriesWithEnglish{"se", "pl", "nl", "sg"};
     int nSameMax = 17;
     int percentageSameMax = PERCENTAGE_TRANS_SAME;
-    if (countriesWithEnglish.contains(langTo))
+    if (langTo.toLower() == "en")
     {
         nSameMax = 30;
         percentageSameMax = 85;
