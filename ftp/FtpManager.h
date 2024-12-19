@@ -73,6 +73,8 @@ private:
     QList<QStringList> m_argumentsInQueue;
     QTimer m_timer;
     void _runProcess(const QStringList &arguments);
+    void _runExceptionIfCurlNotFound();
+    QString _getCurlProgram() const;
 };
 
 #endif // FTPMANAGER_H

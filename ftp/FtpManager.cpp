@@ -1,6 +1,8 @@
 #include <QDebug>
 #include <QFileInfo>
 
+#include "ExceptionFtpSettings.h"
+
 #include "FtpManager.h"
 
 //----------------------------------------
@@ -97,36 +99,7 @@ void FtpManager::uploadFileOneByOne(
 void FtpManager::_startProcessOrPutInQueue(
         const QStringList &arguments)
 {
-    /*
-    QString program;
-#ifdef Q_OS_LINUX
-    program = "curl";
-#else
-    program = "curl-7.85.0_9-win64-mingw/bin/curl.exe";
-#endif
-//*/
     if (m_nQueries < N_QUERIES_MAX) {
-                /*
-                m_process = new QProcess();
-        auto process = new QProcess;
-        connect(process,
-                &QProcess::errorOccurred,
-                this,
-                &FtpManager::onErrorOccured);
-        connect(process,
-                &QProcess::finished,
-                this,
-                &FtpManager::onFinished);
-        connect(process,
-                &QProcess::finished,
-                this,
-                [process](){
-            process->deleteLater();
-        });
-        process->start(program, arguments);
-        ++m_nQueries;
-        ++m_nQueriesTotalFinished;
-        //*/
         _runProcess(arguments);
     } else {
         m_argumentsInQueue << arguments;
@@ -146,21 +119,12 @@ void FtpManager::_addArgumentsToProcessOneByOne(
     m_process->waitForFinished();
     //qDebug() << m_process->readAllStandardError();
     qDebug() << m_process->readAllStandardOutput();
-#ifdef Q_OS_LINUX
-    QString program("curl");
-#else
-    QString program("curl-7.85.0_9-win64-mingw/bin/curl.exe");
-#endif
-    m_process->start(program, arguments);
+    m_process->start(_getCurlProgram(), arguments);
 }
 //----------------------------------------
 void FtpManager::_runProcess(const QStringList &arguments)
 {
-#ifdef Q_OS_LINUX
-    QString program("curl");
-#else
-    QString program("curl-7.85.0_9-win64-mingw/bin/curl.exe");
-#endif
+    QString program{_getCurlProgram()};
     qDebug() << program << arguments.join(" ");
     auto process = new QProcess;
     connect(process,
@@ -186,6 +150,22 @@ void FtpManager::_runProcess(const QStringList &arguments)
     //++m_nQueriesTotalFinished;
 }
 //----------------------------------------
+QString FtpManager::_getCurlProgram() const
+{
+#ifdef Q_OS_WIN
+    QString program("curl-7.85.0_9-win64-mingw/bin/curl.exe");
+    if (!QFile::exists(program))
+    {
+        ExceptionFtpSettings exception;
+        exception.setError(tr("Can’t find") + " " + program);
+        exception.raise();
+    }
+#else
+    QString program("curl");
+#endif
+    return program;
+}
+//----------------------------------------
 void FtpManager::_processArgumentsInQueue()
 {
     int nSpots = N_QUERIES_MAX - m_nQueries;
@@ -196,7 +176,6 @@ void FtpManager::_processArgumentsInQueue()
         }
         auto arguments = m_argumentsInQueue.takeFirst();
         _runProcess(arguments);
-        //m_process->start(program, arguments);
     }
 }
 //----------------------------------------
