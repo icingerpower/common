@@ -17,7 +17,41 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="QLabel" name="label">
+      <widget class="QPushButton" name="buttonBrowseAndOpen">
+       <property name="toolTip">
+        <string>Open a configuration by browsing directories. You can do this to open a configuration not in the list below.</string>
+       </property>
+       <property name="text">
+        <string>Browse and open</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="labelConfigInfo">
+       <property name="text">
+        <string>Select a new empty directory in which your work will be saved</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_4">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_3">
+     <item>
+      <widget class="QLabel" name="labelRecentlyOpened">
        <property name="text">
         <string>Recently opened</string>
        </property>
@@ -29,29 +63,22 @@
         <string>Open a configuration recently opened from the list below</string>
        </property>
        <property name="text">
-        <string>Open recent</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="buttonBrowseAndOpen">
-       <property name="toolTip">
-        <string>Open a configuration by browsing directories. You can do this to open a configuration not in the list below.</string>
-       </property>
-       <property name="text">
-        <string>Browse and open</string>
+        <string>Open selected</string>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="buttonClearRecentSelected">
+       <property name="toolTip">
+        <string>Clear the selected directory from the list below</string>
+       </property>
        <property name="text">
         <string>Clear selected</string>
        </property>
       </widget>
      </item>
      <item>
-      <spacer name="horizontalSpacer_4">
+      <spacer name="horizontalSpacer">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
        </property>

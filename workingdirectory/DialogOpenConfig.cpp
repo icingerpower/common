@@ -18,7 +18,17 @@ DialogOpenConfig::DialogOpenConfig(QWidget *parent) :
     m_opening = false;
     _connectSlots();
     QStringList recentlyOpen = WorkingDirectoryManager::instance()->recentlyOpen();
-    ui->listRecentPaths->addItems(recentlyOpen);
+    if (recentlyOpen.size() > 0)
+    {
+        ui->labelConfigInfo->hide();
+        ui->listRecentPaths->addItems(recentlyOpen);
+    }
+    else
+    {
+        ui->buttonOpenRecent->hide();
+        ui->buttonClearRecentSelected->hide();
+        ui->labelRecentlyOpened->hide();
+    }
 }
 //----------------------------------------
 void DialogOpenConfig::_connectSlots()
@@ -55,7 +65,8 @@ bool DialogOpenConfig::wasAccepted() const
 void DialogOpenConfig::clearRecentSelected()
 {
     auto selectedItems = ui->listRecentPaths->selectedItems();
-    if (selectedItems.size() == 1) {
+    if (selectedItems.size() == 1)
+    {
         int row = ui->listRecentPaths->currentRow();
         QString recent = selectedItems.first()->data(
                     Qt::DisplayRole).toString();
@@ -67,18 +78,24 @@ void DialogOpenConfig::clearRecentSelected()
 void DialogOpenConfig::openRecent()
 {
     auto selectedItems = ui->listRecentPaths->selectedItems();
-    if (selectedItems.size() == 1) {
+    if (selectedItems.size() == 1)
+    {
         QString path = selectedItems[0]->text();
-        if (!QDir(path).exists()) {
+        if (!QDir(path).exists())
+        {
             QMessageBox::warning(
                         this,
                         tr("Directory not found"),
                         tr("The selected directory doesn’t exist anymore."));
-        } else {
+        }
+        else
+        {
             WorkingDirectoryManager::instance()->open(path);
             openAndAccept();
         }
-    } else {
+    }
+    else
+    {
         QMessageBox::warning(
                     this,
                     tr("Selection", "Not one directory selected"),
@@ -97,7 +114,26 @@ void DialogOpenConfig::browseAndOpen()
                 tr("Chose a directory"),
                 lastDirPath,
                 QFileDialog::DontUseNativeDialog);
-    if (!dirPath.isEmpty()) {
+    if (!dirPath.isEmpty())
+    {
+        QDir dir(dirPath);
+        const QStringList &fileNames = dir.entryList(QDir::Files);
+        bool dirEmpty = fileNames.size() == 0;
+        bool dirWithValidSettings = fileNames.contains(
+                    WorkingDirectoryManager::instance()->settingsFileName());
+        if (!dirEmpty && !dirWithValidSettings)
+        {
+            QMessageBox::StandardButton reply
+                    = QMessageBox::question(
+                        this,
+                        tr("Working folder not empty"),
+                        tr("We recommend using a new empty folder. Are you sure that you want to use the selected folder that already contains files?"),
+                        QMessageBox::Yes|QMessageBox::No);
+            if (reply == QMessageBox::No)
+            {
+                return;
+            }
+        }
         settings.setValue(settingKey, QFileInfo(dirPath).path());
         WorkingDirectoryManager::instance()->open(dirPath);
         openAndAccept();
@@ -112,7 +148,8 @@ void DialogOpenConfig::openAndAccept()
 //----------------------------------------
 void DialogOpenConfig::accept()
 {
-    if (m_opening) {
+    if (m_opening)
+    {
         QDialog::accept();
     }
 }

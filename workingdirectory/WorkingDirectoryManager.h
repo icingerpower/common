@@ -17,6 +17,7 @@ public:
     static WorkingDirectoryManager *instance();
     QSharedPointer<QSettings> settings() const;
     QStringList recentlyOpen();
+    QString settingsFileName() const;
     QString settingsFilePath() const;
     QString settingsFilePathUnexportable() const;
     void open(const QString &dir);
