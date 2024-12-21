@@ -170,6 +170,7 @@ void TranslateTableModel::pasteTranslatedText(
             m_listOfStringList[i][index.column()] = lines[i];
         }
         _saveCurrentSignature(langTo, lines);
+        saveBackup();
         emit dataChanged(index.siblingAtRow(0),
                          index.siblingAtRow(rowCount()-1));
     }
