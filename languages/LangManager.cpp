@@ -8,6 +8,7 @@ const QHash<QString, QString> LangManager::COUNTRY_TO_LANG{
     , {"uk","en"}
     , {"ca","en"}
     , {"au","en"}
+    , {"sg","en"}
     , {"mx","es"}
     , {"es","es"}
     , {"jp","jp"}
@@ -18,6 +19,10 @@ const QHash<QString, QString> LangManager::COUNTRY_TO_LANG{
     , {"se","se"}
     , {"nl","nl"}
     , {"in","in"}
+    , {"tr","tr"}
+    , {"sa","ar"}
+    , {"eg","ar"}
+    , {"ae","ar"}
 };
 
 LangManager::LangManager(QObject *parent)
