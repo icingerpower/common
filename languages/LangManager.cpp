@@ -1,8 +1,6 @@
 #include <QSettings>
 #include <QLocale>
 
-#include "model/WorkingDirectoryManager.h"
-
 #include "LangManager.h"
 
 const QHash<QString, QString> LangManager::COUNTRY_TO_LANG{
@@ -51,10 +49,9 @@ bool LangManager::hasTranslation(const QString &langCode) const
     return false;
 }
 
-QStringList LangManager::langCodesFrom() const
+QStringList LangManager::langCodesFrom(const QSet<QString> &countryCodesFrom) const
 {
     QStringList langCodes;
-    const auto &countryCodesFrom = WorkingDirectoryManager::instance()->getCountryCodesSorted();
     for (const auto &countryCodeFrom : countryCodesFrom)
     {
         Q_ASSERT(LangManager::COUNTRY_TO_LANG.contains(countryCodeFrom));

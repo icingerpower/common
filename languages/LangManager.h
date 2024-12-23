@@ -13,7 +13,7 @@ public:
     static const QHash<QString, QString> COUNTRY_TO_LANG;
     bool hasTranslation(const QString &langCode) const;
 
-    QStringList langCodesFrom() const;
+    QStringList langCodesFrom(const QSet<QString> &countryCodesFrom) const;
     QStringList langCodesTo() const;
     QVariant headerData(int section,
                         Qt::Orientation orientation,
