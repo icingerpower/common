@@ -20,6 +20,13 @@ public:
             const QStringList &langs,
             QObject *parent = nullptr);
 
+    const QStringList &header() const;
+    QList<QStringList> getWeirdTranslations() const;
+    QList<QStringList> pickTranslationsToCheck(
+            int number = 3,
+            const QList<QStringList> &listOfStringList = QList<QStringList>{}) const;
+    QString createChatGptPromptCheck(const QList<QStringList> &listOfStringList) const;
+
 
     bool areAllTranslationsDone() const;
     QStringList getLangCodes() const;

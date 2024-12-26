@@ -18,24 +18,19 @@ public:
             const QStringList &texts, const QString &langFrom, const QString &langTo) const;
     QSet<QString> queryUntranslatedTexts( // Return the texts without translation from the sqlite database
             const QSet<QString> &texts, const QString &langFrom, const QString &langTo) const;
-    //QStringList queryUntranslatedTexts( // Return the texts without translation in any languages
-            //const QStringList &texts, const QString &langFrom, const QStringList &langsTo) const;
-    //QHash<QString, QStringList> queryUntranslatedTextByLang( // Return the texts without translation in all of the languages
-            //const QStringList &texts, const QString &langFrom, const QStringList &langsTo) const;
-    void addTranslations(const QString &textFrom, // Add translations, creating column if needed
-                         const QString &textTranslated,
-                         const QString &langFrom,
-                         const QString &langTo);
     void addTranslations(const QStringList &textsFrom, // Add translations, creating column if needed
                          const QStringList &textsTranslated,
                          const QString &langFrom,
-                         const QString &langTo);
+                         const QString &langTo, bool addingFirstLang);
+    int countRows(const QString &langFrom) const;
+    int nextPosition(const QString &langFrom) const;
     void translateUsingGoogleApi(const QStringList &texts, const QString &langFrom, const QString &langTo);
     void translateUsingGoogleApi(const QStringList &texts, const QString &langFrom, const QStringList &langsTo);
 
 
 private:
     QDir m_workingDirectory;
+    static const QString COL_COUNT;
 
     QSqlDatabase getDatabaseOpened(const QString &langFrom) const;
     QString nameDataBase(const QString &langFrom) const;

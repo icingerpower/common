@@ -10,6 +10,8 @@
 
 #include "TrSqlManager.h"
 
+const QString TrSqlManager::COL_COUNT{"position"};
+
 TrSqlManager::TrSqlManager(const QString &workingDirectory)
 {
     m_workingDirectory.setPath(workingDirectory);
@@ -274,116 +276,12 @@ QSet<QString> TrSqlManager::queryUntranslatedTexts(
     return untranslatedTexts;
 }
 
-/*
-QStringList TrSqlManager::queryUntranslatedTexts(
-        const QStringList &texts,
-        const QString &langFrom,
-        const QStringList &langsTo) const
-{
-    QSet<QString> untranslatedSet;
-    for (const auto &langTo : langsTo)
-    {
-        const QStringList &untranslatedTexts
-                = queryUntranslatedTexts(
-                    texts, langFrom, langTo);
-        if (untranslatedSet.isEmpty())
-        {
-            for (const auto &text : untranslatedTexts)
-            {
-                untranslatedSet.insert(text);
-            }
-        }
-        else
-        {
-            QSet<QString> set{untranslatedTexts.begin(), untranslatedTexts.end()};
-            untranslatedSet.intersect(set);
-        }
-    }
-    return QStringList{untranslatedSet.begin(), untranslatedSet.end()};
-}
-
-QHash<QString, QStringList> TrSqlManager::queryUntranslatedTextByLang(
-        const QStringList &texts,
-        const QString &langFrom,
-        const QStringList &langsTo) const
-{
-    QHash<QString, QStringList> untranslated;
-    for (const auto &langTo : langsTo)
-    {
-        untranslated[langTo]
-                = queryUntranslatedTexts(
-                    texts, langFrom, langTo);
-    }
-    return untranslated;
-}
-//*/
-
-void TrSqlManager::addTranslations(
-        const QString &textFrom,
-        const QString &textTranslated,
-        const QString &langFrom,
-        const QString &langTo)
-{
-    QString dbPath = filePathDataBase(langFrom);
-    QSqlDatabase db = getDatabaseOpened(langFrom);
-
-    if (!db.isOpen())
-    {
-        ExceptionTranslation exception;
-        exception.setError(QObject::tr("Sql database is not open for language:") + " " + langFrom);
-        exception.raise();
-    }
-
-    // Ensure the table and columns exist
-    QString createTableQueryStr = "CREATE TABLE IF NOT EXISTS translations ("
-                                  "keyword TEXT PRIMARY KEY)";
-    QSqlQuery createTableQuery(db);
-    if (!createTableQuery.exec(createTableQueryStr))
-    {
-        qDebug() << "Error creating table:" << createTableQuery.lastError().text();
-        ExceptionTranslation exception;
-        exception.setError(QObject::tr("Sql error creating table:") + " " + createTableQuery.lastError().text());
-        exception.raise();
-        return;
-    }
-
-    // Add the target language column if it doesn't exist
-    QString alterTableQueryStr = QString("ALTER TABLE translations ADD COLUMN %1 TEXT").arg(langTo);
-    QSqlQuery alterTableQuery(db);
-    if (!alterTableQuery.exec())
-    {
-        QString errorText = alterTableQuery.lastError().text();
-        if (!errorText.contains("duplicate column name"))
-        {
-            ExceptionTranslation exception;
-            exception.setError(QObject::tr("Sql error adding column:") + " " + alterTableQuery.lastError().text());
-            exception.raise();
-            return;
-        }
-    }
-
-    // Insert or update the translation
-    const QString &insertQueryStr
-            = "INSERT INTO translations (keyword, " + langTo + ") VALUES (:keyword, :" + langTo + ") "
-              "ON CONFLICT(keyword) DO UPDATE SET " + langTo + " = :" + langTo;
-    QSqlQuery insertQuery(db);
-    insertQuery.prepare(insertQueryStr);
-    insertQuery.bindValue(":keyword", textFrom);
-    insertQuery.bindValue(":" + langTo, textTranslated);
-
-    if (!insertQuery.exec())
-    {
-        ExceptionTranslation exception;
-        exception.setError(QObject::tr("Sql error adding translation:") + " " + insertQuery.lastError().text());
-        exception.raise();
-    }
-}
-
 void TrSqlManager::addTranslations(
         const QStringList &textsFrom,
         const QStringList &textsTranslated,
         const QString &langFrom,
-        const QString &langTo)
+        const QString &langTo,
+        bool addingFirstLang)
 {
     // Check that textsFrom and textsTranslated have the same size
     if (textsFrom.size() != textsTranslated.size())
@@ -397,7 +295,8 @@ void TrSqlManager::addTranslations(
     // Retrieve the database
     QSqlDatabase db = getDatabaseOpened(langFrom);
 
-    if (!db.isOpen()) {
+    if (!db.isOpen())
+    {
         ExceptionTranslation exception;
         exception.setError(QObject::tr("SQL database is not open for language: ") + langFrom);
         exception.raise();
@@ -408,7 +307,8 @@ void TrSqlManager::addTranslations(
     QString createTableQueryStr = "CREATE TABLE IF NOT EXISTS translations ("
                                   "keyword TEXT PRIMARY KEY)";
     QSqlQuery createTableQuery(db);
-    if (!createTableQuery.exec(createTableQueryStr)) {
+    if (!createTableQuery.exec(createTableQueryStr))
+    {
         qDebug() << "Error creating table:" << createTableQuery.lastError().text();
         ExceptionTranslation exception;
         exception.setError(QObject::tr("SQL error creating table: ") + createTableQuery.lastError().text());
@@ -418,10 +318,25 @@ void TrSqlManager::addTranslations(
 
     // Check if the target language column exists; if not, add it
     QSqlRecord tableRecord = db.record("translations");
-    if (tableRecord.indexOf(langTo) == -1) {
+    if (tableRecord.indexOf(COL_COUNT) == -1)
+    {
+        QString alterTableQueryStr = QString("ALTER TABLE translations ADD COLUMN %1 INTEGER").arg(COL_COUNT);
+        QSqlQuery alterTableQuery(db);
+        if (!alterTableQuery.exec(alterTableQueryStr))
+        {
+            qDebug() << "Error adding column:" << alterTableQuery.lastError().text();
+            ExceptionTranslation exception;
+            exception.setError(QObject::tr("SQL error adding column: ") + alterTableQuery.lastError().text());
+            exception.raise();
+            return;
+        }
+    }
+    if (tableRecord.indexOf(langTo) == -1)
+    {
         QString alterTableQueryStr = QString("ALTER TABLE translations ADD COLUMN %1 TEXT").arg(langTo);
         QSqlQuery alterTableQuery(db);
-        if (!alterTableQuery.exec(alterTableQueryStr)) {
+        if (!alterTableQuery.exec(alterTableQueryStr))
+        {
             qDebug() << "Error adding column:" << alterTableQuery.lastError().text();
             ExceptionTranslation exception;
             exception.setError(QObject::tr("SQL error adding column: ") + alterTableQuery.lastError().text());
@@ -431,7 +346,8 @@ void TrSqlManager::addTranslations(
     }
 
     // Begin a single transaction for all batch insertions
-    if (!db.transaction()) {
+    if (!db.transaction())
+    {
         qDebug() << "Error starting transaction:" << db.lastError().text();
         ExceptionTranslation exception;
         exception.setError(QObject::tr("SQL error starting transaction: ") + db.lastError().text());
@@ -440,12 +356,25 @@ void TrSqlManager::addTranslations(
     }
 
     // Prepare the insert or update query
-    QString insertQueryStr = QString(
-        "INSERT INTO translations (keyword, %1) VALUES (:keyword, :%1) "
-        "ON CONFLICT(keyword) DO UPDATE SET %1 = excluded.%1").arg(langTo);
+    QString insertQueryStr;
+    if (addingFirstLang)
+    {
+        insertQueryStr = QString(
+                    "INSERT INTO translations (keyword, %1, %2) "
+                    "VALUES (:keyword, :%1, :%2) "
+                    "ON CONFLICT(keyword) DO UPDATE SET %2 = excluded.%2, %1 = excluded.%1"
+                    ).arg(COL_COUNT, langTo);
+    }
+    else
+    {
+        insertQueryStr = QString(
+                    "INSERT INTO translations (keyword, %1) VALUES (:keyword, :%1) "
+                    "ON CONFLICT(keyword) DO UPDATE SET %1 = excluded.%1").arg(langTo);
+    }
 
     QSqlQuery insertQuery(db);
-    if (!insertQuery.prepare(insertQueryStr)) {
+    if (!insertQuery.prepare(insertQueryStr))
+    {
         qDebug() << "Error preparing insert query:" << insertQuery.lastError().text();
         ExceptionTranslation exception;
         exception.setError(QObject::tr("SQL error preparing insert query: ") + insertQuery.lastError().text());
@@ -456,20 +385,32 @@ void TrSqlManager::addTranslations(
 
     // Batch size to prevent exceeding parameter limits
     const int batchSize = 500; // Adjust based on your database's parameter limit
+    int currentMax = 0;
+    if (addingFirstLang)
+    {
+        currentMax = nextPosition(langFrom);
+    }
 
     int totalTranslations = textsFrom.size();
-    for (int offset = 0; offset < totalTranslations; offset += batchSize) {
+    for (int offset = 0; offset < totalTranslations; offset += batchSize)
+    {
         int currentBatchSize = qMin(batchSize, totalTranslations - offset);
 
-        for (int i = 0; i < currentBatchSize; ++i) {
+        for (int i = 0; i < currentBatchSize; ++i)
+        {
             int index = offset + i;
             const QString &textFrom = textsFrom.at(index);
             const QString &textTranslated = textsTranslated.at(index);
 
             insertQuery.bindValue(":keyword", textFrom);
             insertQuery.bindValue(":" + langTo, textTranslated);
+            if (addingFirstLang)
+            {
+                insertQuery.bindValue(":" + COL_COUNT, currentMax);
+            }
 
-            if (!insertQuery.exec()) {
+            if (!insertQuery.exec())
+            {
                 qDebug() << "Error executing insert query for text:" << textFrom << " Error:" << insertQuery.lastError().text();
                 ExceptionTranslation exception;
                 exception.setError(QObject::tr("SQL error adding translation for text: ") + textFrom + " " + insertQuery.lastError().text());
@@ -481,7 +422,8 @@ void TrSqlManager::addTranslations(
     }
 
     // Commit the transaction after all batches are processed
-    if (!db.commit()) {
+    if (!db.commit())
+    {
         qDebug() << "Error committing transaction:" << db.lastError().text();
         ExceptionTranslation exception;
         exception.setError(QObject::tr("SQL error committing transaction: ") + db.lastError().text());
@@ -490,6 +432,71 @@ void TrSqlManager::addTranslations(
         return;
     }
 }
+
+int TrSqlManager::countRows(const QString &langFrom) const
+{
+    QSqlDatabase db = getDatabaseOpened(langFrom);
+    if (!db.isOpen())
+    {
+        qDebug() << "Database is not open!";
+        return 0;
+    }
+
+    // Prepare the query to count rows
+    QSqlQuery query(db);
+    QString countQueryStr = "SELECT COUNT(*) FROM translations";
+
+    if (!query.exec(countQueryStr))
+    {
+        qDebug() << "Error counting rows:" << query.lastError().text();
+        return 0;
+    }
+
+    // Retrieve the count
+    if (query.next())
+    {
+        int count = query.value(0).toInt();
+        return count;
+    }
+    else
+    {
+        qDebug() << "Error retrieving row count";
+        return 0;
+    }
+}
+
+int TrSqlManager::nextPosition(const QString &langFrom) const
+{
+    // Get the database
+    QSqlDatabase db = getDatabaseOpened(langFrom);
+    if (!db.isOpen())
+    {
+        qDebug() << "Database is not open!";
+        return 1; // Default to 1
+    }
+
+    // Prepare the query to find the max position
+    QSqlQuery query(db);
+    QString maxPositionQueryStr = QString{"SELECT COALESCE(MAX(%1), 0) + 1 FROM translations"}.arg(COL_COUNT);
+
+    if (!query.exec(maxPositionQueryStr))
+    {
+        qDebug() << "Error getting next position:" << query.lastError().text();
+        return 1; // Default to 1
+    }
+
+    // Retrieve the next position
+    if (query.next())
+    {
+        return query.value(0).toInt();
+    }
+    else
+    {
+        qDebug() << "Error retrieving max position";
+        return 1; // Default to 1
+    }
+}
+
 
 void TrSqlManager::translateUsingGoogleApi(
         const QStringList &texts, const QString &langFrom, const QString &langTo)

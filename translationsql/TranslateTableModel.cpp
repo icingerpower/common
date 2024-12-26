@@ -1,4 +1,6 @@
 #include <QSettings>
+#include <QRandomGenerator>
+#include <QRegularExpression>
 
 #include "ExceptionTranslation.h"
 
@@ -53,6 +55,147 @@ TranslateTableModel::TranslateTableModel(
         lineValues[0] = text.toString();
         m_listOfStringList << lineValues;
     }
+}
+//----------------------------------------------------------
+const QStringList &TranslateTableModel::header() const
+{
+    return m_header;
+}
+//----------------------------------------------------------
+QList<QStringList> TranslateTableModel::getWeirdTranslations() const
+{
+    QList<QStringList> weirdTranslations;
+    // Translations similar
+    QSet<QString> langsWithALotEnglish{"pl", "nl", "se", "tr"};
+    if (m_langs[0] == "jp")
+    {
+        for (const auto &stringList : m_listOfStringList)
+        {
+            static QRegularExpression regLatin{"[A-Za-z1-9]"};
+            if (!QString{stringList[0]}.replace(" ", "").contains(regLatin))
+            {
+                for (int i=0; i<m_langs.size(); ++i)
+                {
+                    if (m_langs[i] != "zh"
+                            && stringList[0].compare(stringList[i+1], Qt::CaseInsensitive) == 0)
+                    {
+                        weirdTranslations << stringList;
+                    }
+                }
+            }
+        }
+    }
+    else if (m_langs[0] == "ar")
+    {
+        for (const auto &stringList : m_listOfStringList)
+        {
+            for (int i=0; i<m_langs.size(); ++i)
+            {
+                if (m_langs[i] != "fr"
+                        && m_langs[i] != "en"
+                        && stringList[0].compare(stringList[i+1], Qt::CaseInsensitive) == 0)
+                {
+                    weirdTranslations << stringList;
+                }
+            }
+        }
+    }
+    else if (langsWithALotEnglish.contains(m_langs[0]))
+    {
+        for (const auto &stringList : m_listOfStringList)
+        {
+            for (int i=0; i<m_langs.size(); ++i)
+            {
+                if (m_langs[i] != "en"
+                        && stringList[0].compare(stringList[i+1], Qt::CaseInsensitive) == 0)
+                {
+                    weirdTranslations << stringList;
+                }
+            }
+        }
+    }
+    else if (m_langs[0] == "en")
+    {
+        for (const auto &stringList : m_listOfStringList)
+        {
+            for (int i=0; i<m_langs.size(); ++i)
+            {
+                if (m_langs[i] != "es"
+                        && stringList[0].compare(stringList[i+1], Qt::CaseInsensitive) == 0)
+                {
+                    weirdTranslations << stringList;
+                }
+            }
+        }
+    }
+    else
+    {
+        for (const auto &stringList : m_listOfStringList)
+        {
+            for (int i=0; i<m_langs.size(); ++i)
+            {
+                if (stringList[0].compare(stringList[i+1], Qt::CaseInsensitive) == 0)
+                {
+                    weirdTranslations << stringList;
+                }
+            }
+        }
+    }
+    return weirdTranslations;
+}
+//----------------------------------------------------------
+QList<QStringList> TranslateTableModel::pickTranslationsToCheck(
+        int number, const QList<QStringList> &listOfStringList) const
+{
+    const QList<QStringList> &curListOfStringList
+            = listOfStringList.isEmpty() ? m_listOfStringList : listOfStringList;
+    if (number >= curListOfStringList.size())
+    {
+        return curListOfStringList;
+    }
+
+    QRandomGenerator randomGenerator(QRandomGenerator::global()->generate());
+
+    int totalLines = curListOfStringList.size();
+
+    QSet<int> selectedIndices;
+    QList<QStringList> result;
+
+    while (result.size() < number) {
+        // Generate a random index
+        int randomIndex = randomGenerator.bounded(totalLines);
+
+        // Ensure no duplicates
+        if (!selectedIndices.contains(randomIndex))
+        {
+            selectedIndices.insert(randomIndex);
+            result.append(curListOfStringList[randomIndex]);
+        }
+    }
+
+    return result;
+}
+//----------------------------------------------------------
+QString TranslateTableModel::createChatGptPromptCheck(
+        const QList<QStringList> &listOfStringList) const
+{
+    QString prompt = "I did some translations but there could be either copy paste error"
+                     "or wrong language selected. Could you check the following translations."
+                     "You should report only big error due to either a failed copy paste"
+                     "or a wrong language selected.";
+    for (const auto &stringList : listOfStringList)
+    {
+        prompt += "\n\"" + stringList[0] + "\"";
+        prompt += " translated as: (";
+        QStringList elements;
+        for (int i=0; i<m_langs.size(); ++i)
+        {
+            elements << m_langs[i] + ": " + stringList[i+1];
+        }
+        prompt += elements.join(", ");
+        prompt += ")";
+    }
+    return prompt;
 }
 //----------------------------------------------------------
 bool TranslateTableModel::areAllTranslationsDone() const
