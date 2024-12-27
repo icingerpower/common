@@ -7,7 +7,9 @@
 #include "ui_DialogTranslationPasted.h"
 
 DialogTranslationPasted::DialogTranslationPasted(
-        TranslateTableModel *translateTableModel, QWidget *parent) :
+        TranslateTableModel *translateTableModel,
+        const QString &imageFilePath,
+        QWidget *parent) :
     QDialog(parent),
     ui(new Ui::DialogTranslationPasted)
 {
@@ -54,4 +56,11 @@ void DialogTranslationPasted::copyPrompt()
 {
     auto clipboard = QApplication::clipboard();
     clipboard->setText(ui->plainTextPrompt->toPlainText());
+}
+
+void DialogTranslationPasted::accept()
+{
+    auto pixmap = grab();
+    pixmap.save(m_imageFilePath);
+    QDialog::accept();
 }

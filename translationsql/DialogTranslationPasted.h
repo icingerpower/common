@@ -16,15 +16,18 @@ class DialogTranslationPasted : public QDialog
 public:
     explicit DialogTranslationPasted(
             TranslateTableModel *translateTableModel,
+            const QString &imageFilePath,
             QWidget *parent = nullptr);
     ~DialogTranslationPasted();
     QString getPrompt() const;
 
 public slots:
     void copyPrompt();
+    void accept() override;
 
 private:
     Ui::DialogTranslationPasted *ui;
+    QString m_imageFilePath;
 };
 
 #endif // DIALOGTRANSLATIONPASTED_H
