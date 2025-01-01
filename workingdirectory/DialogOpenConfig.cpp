@@ -22,6 +22,8 @@ DialogOpenConfig::DialogOpenConfig(QWidget *parent) :
     {
         ui->labelConfigInfo->hide();
         ui->listRecentPaths->addItems(recentlyOpen);
+        ui->buttonOpenRecent->setFocus();
+        ui->listRecentPaths->setCurrentRow(0);
     }
     else
     {
