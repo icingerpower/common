@@ -149,6 +149,8 @@ void WorkingDirectoryManager::installDarkPalette()
     palette.setColor(QPalette::Base, darkerColor);
     palette.setColor(QPalette::AlternateBase,
                      darkColor);
+    palette.setColor(QPalette::Light, Qt::white);
+    palette.setColor(QPalette::Midlight, Qt::white);
     palette.setColor(QPalette::ToolTipBase, darkerColor);
     palette.setColor(QPalette::ToolTipText, Qt::white);
     palette.setColor(QPalette::Text, Qt::white);
@@ -175,6 +177,27 @@ void WorkingDirectoryManager::installDarkOrangePalette()
     QColor modernOrange(236,163,104);
     palette.setColor(QPalette::Highlight, modernOrange);
     app->setPalette(palette);
+    QString styleSheet = app->styleSheet();
+    styleSheet += "QSplitter::handle {background:" + modernOrange.name() + "}";
+    styleSheet += "QTableView::indicator::unchecked {"
+                  "    border: 1px solid gray;"  // Checkbox border
+                  "}"
+                  "QListView::indicator::unchecked {"
+                  "    border: 1px solid gray;"  // Checkbox border
+                  "}"
+                  "QTreeView::indicator::unchecked {"
+                  "    border: 1px solid gray;"  // Checkbox border
+                  "}"
+                  "QTableWidget::indicator::unchecked {"
+                  "    border: 1px solid gray;"  // Checkbox border
+                  "}"
+                  "QListWidget::indicator::unchecked {"
+                  "    border: 1px solid gray;"  // Checkbox border
+                  "}"
+                  "QTreeWidget::indicator::unchecked {"
+                  "    border: 1px solid gray;"  // Checkbox border
+                  "}";
+    app->setStyleSheet(styleSheet);
 }
 //----------------------------------------
 void WorkingDirectoryManager::installDarkBluePalette()
