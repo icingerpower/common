@@ -28,7 +28,7 @@ QString CountryManager::IRELAND_NORTHEN = QObject::tr("Irelande du nord");
 QString CountryManager::LATVIA = QObject::tr("Lettonie");
 QString CountryManager::LUXEMBOURG = QObject::tr("Luxembourg");
 QString CountryManager::MALTA = QObject::tr("Malte");
-QString CountryManager::PORTUGAL = QObject::tr("Portulage");
+QString CountryManager::PORTUGAL = QObject::tr("Portugale");
 QString CountryManager::ROMANIA = QObject::tr("Roumanie");
 QString CountryManager::SLOVAKIA = QObject::tr("Slovaquie");
 QString CountryManager::SLOVENIA = QObject::tr("Slovénie");
@@ -256,7 +256,7 @@ const QStringList *CountryManager::countryNames()
                , QObject::tr("Ouganda")
                , QObject::tr("Ukraine")
                , QObject::tr("Emirats Arabes Unis")
-               , QObject::tr("Royaume-Uni de Grande-Bretagne et d'Irlande du Nord")
+               //, QObject::tr("Royaume-Uni de Grande-Bretagne et d'Irlande du Nord")
                , QObject::tr("Îles mineures éloignées des États-Unis")
                , QObject::tr("États-Unis")
                , QObject::tr("Uruguay")
@@ -923,7 +923,7 @@ QString CountryManager::countryName(const QString &countryCode) const
                {"UG", QObject::tr("Ouganda")},
                {"UA", QObject::tr("Ukraine")},
                {"AE", QObject::tr("Emirats Arabes Unis")},
-               {"GB", QObject::tr("Royaume-Uni de Grande-Bretagne et d'Irlande du Nord")},
+               {"GB", UK}, //QObject::tr("Royaume-Uni de Grande-Bretagne et d'Irlande du Nord")},
                {"UM", QObject::tr("Îles mineures éloignées des États-Unis")},
                {"US", QObject::tr("États-Unis")},
                {"UY", QObject::tr("Uruguay")},
