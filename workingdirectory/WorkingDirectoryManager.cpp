@@ -27,7 +27,16 @@ WorkingDirectoryManager *WorkingDirectoryManager::instance()
 QSharedPointer<QSettings> WorkingDirectoryManager::settings() const
 {
     return QSharedPointer<QSettings>{new QSettings{settingsFilePath(),
-                                                   QSettings::IniFormat}};
+                    QSettings::IniFormat}};
+}
+
+QSharedPointer<QSettings> WorkingDirectoryManager::settingsLocalIfClient() const
+{
+#ifdef CLIENT
+    return QSharedPointer<QSettings>{new QSettings{}};
+#else
+    return settings();
+#endif
 }
 //----------------------------------------
 QStringList WorkingDirectoryManager::recentlyOpen()
