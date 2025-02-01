@@ -11,7 +11,7 @@ const QHash<QString, QString> LangManager::COUNTRY_TO_LANG{
     , {"sg","en"}
     , {"mx","es"}
     , {"es","es"}
-    , {"jp","jp"}
+    , {"jp","ja"}
     , {"de","de"}
     , {"fr","fr"}
     , {"it","it"}

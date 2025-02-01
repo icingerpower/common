@@ -67,7 +67,7 @@ QList<QStringList> TranslateTableModel::getWeirdTranslations() const
     QList<QStringList> weirdTranslations;
     // Translations similar
     QSet<QString> langsWithALotEnglish{"pl", "nl", "se", "tr"};
-    if (m_langs[0] == "jp")
+    if (m_langs[0] == "jp" || m_langs[0] == "ja")
     {
         for (const auto &stringList : m_listOfStringList)
         {

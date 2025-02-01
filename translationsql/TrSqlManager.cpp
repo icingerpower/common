@@ -70,6 +70,17 @@ QString TrSqlManager::queryTranslation(
         const QString &text, const QString &langFrom, const QString &langTo) const
 {
     QSqlDatabase db = getDatabaseOpened(langFrom);
+    if (langTo == "en")
+    {
+        if (text == "bolsos de fiesta mujer boda")
+        {
+            int TEMP=10;++TEMP;
+        }
+        else if (text.contains("fiesta mujer boda", Qt::CaseInsensitive))
+        {
+            int TEMP=10;++TEMP;
+        }
+    }
 
     if (db.isOpen())
     {
@@ -78,14 +89,25 @@ QString TrSqlManager::queryTranslation(
         QSqlQuery query(db);
         query.prepare(queryStr);
         query.addBindValue(text);
+                // We surround the text with '%' on both sides so that the SQL will find it
+        // if it appears anywhere in the column.
+        bool execOk = query.exec();
 
-        if (query.exec() && query.next())
+        if (execOk && query.next())
         {
             return query.value(0).toString(); // Return the translation
         }
         else
         {
-            qDebug() << "Translation not found or error in query:" << query.lastError().text();
+            qDebug() << "Database name:" << db.databaseName();
+            qDebug() << "Database isOpen:" << db.isOpen() << ", lastError:" << db.lastError();
+            qDebug() << "Query size:" << query.size();
+            qDebug() << "Translation not found or error in query:"
+                     << query.lastError().text() << " - "
+                     << langFrom << "=>" << langTo
+                     << " - execOk:" << execOk << " - " << query.executedQuery()
+                     << " - " << text;
+            qDebug() << "Database name:" << db.databaseName();
         }
     }
     return QString{};

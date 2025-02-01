@@ -41,16 +41,16 @@ DialogSelectLangage::DialogSelectLangage(QWidget *parent) :
             ui->listWidgetLangs->setFont(font);
             m_languagesToCode[languageName] = langCodes[i];
         }
-        if (!languageNameToSel.isEmpty())
+    }
+    if (!languageNameToSel.isEmpty())
+    {
+        for (int i=0; i<langCodes.size(); ++i)
         {
-            for (int i=0; i<langCodes.size(); ++i)
+            if (ui->listWidgetLangs->item(i)->text() == languageNameToSel)
             {
-                if (ui->listWidgetLangs->item(i)->text() == languageNameToSel)
-                {
-                    indexToSel = i;
-                    ui->listWidgetLangs->setCurrentRow(indexToSel);
-                    break;
-                }
+                indexToSel = i;
+                ui->listWidgetLangs->setCurrentRow(indexToSel);
+                break;
             }
         }
     }
