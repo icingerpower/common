@@ -16,6 +16,7 @@ public:
     ~WorkingDirectoryManager();
     static WorkingDirectoryManager *instance();
     QSharedPointer<QSettings> settings() const;
+    QSharedPointer<QSettings> settingsLocalIfClient() const;
     QStringList recentlyOpen();
     QString settingsFileName() const;
     QString settingsFilePath() const;
