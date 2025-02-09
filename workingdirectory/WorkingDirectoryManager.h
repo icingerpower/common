@@ -20,6 +20,7 @@ public:
     QStringList recentlyOpen();
     QString settingsFileName() const;
     QString settingsFilePath() const;
+    QString settingsFilePath(const QString &customNameIni) const;
     QString settingsFilePathUnexportable() const;
     void open(const QString &dir);
     void open(const QDir &dir);

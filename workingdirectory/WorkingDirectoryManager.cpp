@@ -48,10 +48,20 @@ QStringList WorkingDirectoryManager::recentlyOpen()
     }
     return dirs;
 }
-
+//----------------------------------------
 QString WorkingDirectoryManager::settingsFileName() const
 {
     return "settings.ini";
+}
+//----------------------------------------
+QString WorkingDirectoryManager::settingsFilePath(
+        const QString &customNameIni) const
+{
+    if (customNameIni.endsWith(".ini", Qt::CaseInsensitive))
+    {
+        return m_workingDir.filePath(customNameIni);
+    }
+    return m_workingDir.filePath(customNameIni + ".ini");
 }
 //----------------------------------------
 QString WorkingDirectoryManager::settingsFilePath() const
