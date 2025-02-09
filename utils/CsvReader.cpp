@@ -1,8 +1,41 @@
-#include <QtCore/qfile.h>
+#include <QFile>
+#include <QMap>
 
 #include "CsvReader.h"
 
 
+//----------------------------------------------------------
+QPair<QString, QString> CsvReader::guessColStringSeps(const QString &filePath)
+{
+    QPair<QString, QString> colAndString;
+    QFile file(filePath);
+    if (file.open(QFile::ReadOnly))
+    {
+        QTextStream stream{&file};
+        QString line = stream.readLine();
+        QMap<int, QString> countSep;
+        QStringList seps{"\t", ";", ","};
+        for (const auto &sep : seps)
+        {
+            int count = line.count(sep);
+            countSep[count] = sep;
+            colAndString.first = countSep.last();
+        }
+        QString line2 = stream.readLine();
+        if (line2.size() > 1)
+        {
+            line = line2;
+        }
+        //int nElements = line2.count(colAndString.first);
+        int nGuillemets = line2.count("\"");
+        if (nGuillemets > 3)
+        {
+            colAndString.second = "\"";
+        }
+        file.close();
+    }
+    return colAndString;
+}
 //----------------------------------------------------------
 CsvReader::CsvReader(const QString &fileName,
         QString sep,

@@ -22,6 +22,7 @@ struct DataFromCsv {
 class CsvReader
 {
 public:
+    static QPair<QString, QString> guessColStringSeps(const QString &filePath);
     CsvReader(const QString &fileName,
               QString sep = ",",
               QString guillemetsForString = "",
