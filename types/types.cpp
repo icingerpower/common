@@ -329,6 +329,29 @@ QDataStream & operator >> (QDataStream &stream, QHash<QString, QList<QDate>> &ha
 }
 //----------------------------------------
 //----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QHash<QString, QSet<QString>> &hashOfStringSet)
+{
+    const QStringList &keys = hashOfStringSet.keys();
+    stream << keys;
+    for (auto itPair=hashOfStringSet.begin();
+         itPair!=hashOfStringSet.end(); ++itPair) {
+        stream << itPair.value();
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QHash<QString, QSet<QString>> &hashOfStringSet)
+{
+    QStringList keys;
+    stream >> keys;
+    for (const auto &key : keys)
+    {
+        stream >> hashOfStringSet[key];
+    }
+    return stream;
+}
+//----------------------------------------
+//----------------------------------------
 QDataStream & operator << (QDataStream &stream, const QList<QHash<QString, QVariant>> &listOfHashOfStringVariant) {
     stream << int(listOfHashOfStringVariant.size());
     for (const auto &hash : listOfHashOfStringVariant)
