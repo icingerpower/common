@@ -26,9 +26,9 @@ public slots:
     void removeCustomer();
     void search();
     void searchReset();
-    void addEthernetAddress();
-    void replaceEthernetAddress();
-    void removeEthernetAddress();
+    void addComputerId();
+    void replaceComputerId();
+    void removeComputerId();
 
 protected slots:
     void selectCustomer(const QItemSelection &selected, const QItemSelection &deselected);

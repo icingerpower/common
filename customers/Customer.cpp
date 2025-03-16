@@ -8,7 +8,7 @@ QString Customer::KEY_EMAIL_DATA{"emailData"};
 QString Customer::KEY_DATE_PAYMENT{"paymentDate"};
 QString Customer::KEY_DATE_LAST_PAYMENT{"lastPaymentDate"};
 QString Customer::KEY_MAX_IPS{"maxEthernetAddresses"};
-QString Customer::KEY_ETHERNET_ADDRESSES{"ethernetAddress"};
+QString Customer::KEY_COMPUTER_ID_ADDRESSES{"ethernetAddress"};
 QString Customer::KEY_FOREVER_ACCESS{"foreverAccess"};
 
 Customer::Customer(
@@ -16,7 +16,7 @@ Customer::Customer(
     const QString &email,
     const QString &name,
     const QDate &datePayment,
-    int maxEthernetAddresses)
+    int maxComputerIds)
 {
     m_id = id;
     m_email = email;
@@ -24,7 +24,7 @@ Customer::Customer(
     m_name = name;
     m_datePayment = datePayment;
     m_dateLastPayment = datePayment;
-    m_maxEthernetAddresses = maxEthernetAddresses;
+    m_maxComputerIds = maxComputerIds;
     m_foreverAccess = false;
 }
 
@@ -37,26 +37,10 @@ Customer::Customer(const QHash<QString, QVariant> &hash)
     m_emailData = hash.value(KEY_EMAIL_DATA, m_email).toString();
     m_datePayment = hash[KEY_DATE_PAYMENT].toDate();
     m_dateLastPayment = hash[KEY_DATE_LAST_PAYMENT].toDate();
-    m_maxEthernetAddresses = hash[KEY_MAX_IPS].toInt();
-    m_ethernetAddresses.setStringList(hash[KEY_ETHERNET_ADDRESSES].toStringList());
-    m_foreverAccess = hash.value(KEY_ETHERNET_ADDRESSES, false).toBool();
+    m_maxComputerIds = hash[KEY_MAX_IPS].toInt();
+    m_computerIds.setStringList(hash[KEY_COMPUTER_ID_ADDRESSES].toStringList());
+    m_foreverAccess = hash.value(KEY_COMPUTER_ID_ADDRESSES, false).toBool();
 }
-
-/*
-Customer::Customer(Customer&& other) noexcept
-    : m_id(std::move(other.m_id)),
-      m_name(std::move(other.m_name)),
-      m_phoneNumber(std::move(other.m_phoneNumber)),
-      m_email(std::move(other.m_email)),
-      m_datePayment(std::move(other.m_datePayment)),
-      m_dateLastPayment(std::move(other.m_dateLastPayment)),
-      m_maxEthernetAddresses(other.m_maxEthernetAddresses)
-      m_foreverAccess(other.m_foreverAccess)
-{
-    m_ethernetAddresses.setStringList(other.m_ethernetAddresses.stringList());
-    other.m_maxEthernetAddresses = 0;
-}
-//*/
 
 QHash<QString, QVariant> Customer::toHash() const
 {
@@ -68,18 +52,18 @@ QHash<QString, QVariant> Customer::toHash() const
     hash[KEY_EMAIL_DATA] = m_emailData;
     hash[KEY_DATE_PAYMENT] = m_datePayment;
     hash[KEY_DATE_LAST_PAYMENT] = m_dateLastPayment;
-    hash[KEY_MAX_IPS] = m_maxEthernetAddresses;
-    hash[KEY_ETHERNET_ADDRESSES] = m_ethernetAddresses.stringList();
+    hash[KEY_MAX_IPS] = m_maxComputerIds;
+    hash[KEY_COMPUTER_ID_ADDRESSES] = m_computerIds.stringList();
     hash[KEY_FOREVER_ACCESS] = m_foreverAccess;
     return hash;
 }
 
-void Customer::addEthernetAddress(const QString &ethernet)
+void Customer::addComputerId(const QString &computerId)
 {
-    if (m_maxEthernetAddresses > m_ethernetAddresses.rowCount())
+    if (m_maxComputerIds > m_computerIds.rowCount())
     {
-        m_ethernetAddresses.insertRows(0, 1);
-        m_ethernetAddresses.setData(m_ethernetAddresses.index(0, 0), ethernet);
+        m_computerIds.insertRows(0, 1);
+        m_computerIds.setData(m_computerIds.index(0, 0), computerId);
     }
 }
 
@@ -158,34 +142,34 @@ void Customer::setDateLastPayment(const QDate &newDateLastPayment)
     m_dateLastPayment = newDateLastPayment;
 }
 
-int Customer::maxEthernetAddresses() const
+int Customer::maxComputerIds() const
 {
-    return m_maxEthernetAddresses;
+    return m_maxComputerIds;
 }
 
-void Customer::setMaxEthernetAddresses(int newMaxEthernetAddresses)
+void Customer::setMaxComputerIds(int newMaxComputerIds)
 {
-    m_maxEthernetAddresses = newMaxEthernetAddresses;
+    m_maxComputerIds = newMaxComputerIds;
 }
 
-QStringListModel &Customer::ethernetAddresses()
+QStringListModel &Customer::computerUniqueIds()
 {
-    return m_ethernetAddresses;
+    return m_computerIds;
 }
 
-void Customer::setEthernetAddresses(const QStringList &newEthernetAddresses)
+void Customer::setComputerIds(const QStringList &newMaxComputerIds)
 {
-    m_ethernetAddresses.setStringList(newEthernetAddresses);
+    m_computerIds.setStringList(newMaxComputerIds);
 }
 
-void Customer::replaceEthernetAddress(int rowIndex, const QString &afterEth)
+void Customer::replaceComputerId(int rowIndex, const QString &afterEth)
 {
-    m_ethernetAddresses.setData(
-                m_ethernetAddresses.index(rowIndex, 0),
+    m_computerIds.setData(
+                m_computerIds.index(rowIndex, 0),
                 afterEth);
 }
 
-void Customer::removeEthernetAddress(int rowIndex)
+void Customer::removeComputerId(int rowIndex)
 {
-    m_ethernetAddresses.removeRows(rowIndex, 1);
+    m_computerIds.removeRows(rowIndex, 1);
 }

@@ -12,7 +12,7 @@ DialogNoLicence::DialogNoLicence(QWidget *parent)
 {
     ui->setupUi(this);
     ui->lineEdit->setText(
-        CustomerTableModel::ethernetAddress());
+        CustomerTableModel::getUniqueMachineIdentifier());
     connect(ui->buttonCopy,
             &QPushButton::clicked,
             this,

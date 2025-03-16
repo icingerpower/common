@@ -12,7 +12,7 @@ public:
              const QString &email,
              const QString &name,
              const QDate &datePayment,
-             int maxEthernetAddresses);
+             int maxComputerIds);
     Customer(const QHash<QString, QVariant> &hashedData);
     //Customer(Customer&& other) noexcept;
 
@@ -35,14 +35,14 @@ public:
     QDate dateLastPayment() const;
     void setDateLastPayment(const QDate &newDateLastPayment);
 
-    int maxEthernetAddresses() const;
-    void setMaxEthernetAddresses(int newMaxEthernetAddresses);
+    int maxComputerIds() const;
+    void setMaxComputerIds(int newMaxComputerIds);
 
-    QStringListModel &ethernetAddresses();
-    void setEthernetAddresses(const QStringList &newEthernetAddresses);
-    void replaceEthernetAddress(int rowIndex, const QString &afterEth);
-    void removeEthernetAddress(int rowIndex);
-    void addEthernetAddress(const QString &ethernetAddress);
+    QStringListModel &computerUniqueIds();
+    void setComputerIds(const QStringList &newComputerIds);
+    void replaceComputerId(int rowIndex, const QString &afterEth);
+    void removeComputerId(int rowIndex);
+    void addComputerId(const QString &computerId);
 
     bool foreverAccess() const;
     void setForeverAccess(bool newForeverAccess);
@@ -58,8 +58,8 @@ protected:
     QString m_emailData;
     QDate m_datePayment;
     QDate m_dateLastPayment;
-    int m_maxEthernetAddresses;
-    QStringListModel m_ethernetAddresses;
+    int m_maxComputerIds;
+    QStringListModel m_computerIds;
     bool m_foreverAccess;
     static QString KEY_ID;
     static QString KEY_NAME;
@@ -69,7 +69,7 @@ protected:
     static QString KEY_DATE_PAYMENT;
     static QString KEY_DATE_LAST_PAYMENT;
     static QString KEY_MAX_IPS;
-    static QString KEY_ETHERNET_ADDRESSES;
+    static QString KEY_COMPUTER_ID_ADDRESSES;
     static QString KEY_FOREVER_ACCESS;
 };
 

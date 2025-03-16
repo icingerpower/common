@@ -16,21 +16,21 @@ class CustomerTableModel : public QAbstractTableModel
     Q_OBJECT
 
 public:
-    static QString KEY_SETTINGS_CUSTOMER_MAC_ADDRESSES;
+    static QString KEY_SETTINGS_CUSTOMER_COMPUTER_IDS;
     explicit CustomerTableModel(const QString &settingsFilePath,
                                 const QString &settingsFilePathSecret,
                                 QObject *parent = nullptr);
     void addCustomer(QSharedPointer<Customer> customer);
     void removeCustomer(const QModelIndex &index);
-    QStringListModel &getEthernetAddresses(const QModelIndex &index);
-    void removeEthernetAddress(const QModelIndex &indexCustomer, int rowIndexEth);
-    void addEthernetAddress(const QModelIndex &indexCustomer, const QString &ethernetAddress);
-    void replaceEthernetAddress(const QModelIndex &indexCustomer,
-                                int rowIndexEth,
-                                const QString &ethernetAddressAfter);
-    bool isEthernetAddressAllowed() const;
-    bool wasEthernetAddressAllowed() const;
-    static QString ethernetAddress();
+    QStringListModel &getComputerIds(const QModelIndex &index);
+    void removeComputerId(const QModelIndex &indexCustomer, int rowIndexId);
+    void addComputerId(const QModelIndex &indexCustomer, const QString &computerId);
+    void replaceComputerId(const QModelIndex &indexCustomer,
+                                int rowIndexId,
+                                const QString &computerIdAfter);
+    bool isComputerIdAllowed() const;
+    bool wasComputerIdAllowed() const;
+    static QString getUniqueMachineIdentifier();
 
     // Header:
     QVariant headerData(int section,
@@ -65,6 +65,9 @@ private:
     void _connectCustomer(Customer *customer);
     QString m_settingsFilePath;
     QString m_settingsFilePathSecret;
+    static QString getMacOSHardwareUUID();
+    static QString getLinuxMachineId();
+    static QString getMachineUUIDWindows();
 };
 
 #endif // CUSTOMERTABLEMODEL_H

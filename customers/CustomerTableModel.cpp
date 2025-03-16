@@ -1,10 +1,13 @@
 #include <QSettings>
+#include <QProcess>
 #include <QNetworkInterface>
+#include <QFile>
+#include <QRegularExpression>
 
 #include "CustomerTableModel.h"
 
 QString CustomerTableModel::KEY_SETTINGS_CUSTOMERS{"hashkeywords"};
-QString CustomerTableModel::KEY_SETTINGS_CUSTOMER_MAC_ADDRESSES{"hashtranslation"};
+QString CustomerTableModel::KEY_SETTINGS_CUSTOMER_COMPUTER_IDS{"hashtranslation"};
 
 
 CustomerTableModel::CustomerTableModel(
@@ -38,10 +41,10 @@ CustomerTableModel::CustomerTableModel(
                   "id-number-ips",
                   tr("Number of ips"),
             [](const Customer &customer) -> QVariant {
-                              return customer.maxEthernetAddresses();
+                              return customer.maxComputerIds();
                    },
             [](Customer &customer, const QVariant &value) {
-        customer.setMaxEthernetAddresses(value.toInt());
+        customer.setMaxComputerIds(value.toInt());
                    }};
     m_colInfos << ColInfo{true,
                   "id-payment-date-last",
@@ -115,32 +118,32 @@ void CustomerTableModel::removeCustomer(const QModelIndex &index)
     endRemoveRows();
 }
 
-QStringListModel &CustomerTableModel::getEthernetAddresses(const QModelIndex &index)
+QStringListModel &CustomerTableModel::getComputerIds(const QModelIndex &index)
 {
-    return m_customers[index.row()]->ethernetAddresses();
+    return m_customers[index.row()]->computerUniqueIds();
 }
 
-void CustomerTableModel::removeEthernetAddress(
+void CustomerTableModel::removeComputerId(
         const QModelIndex &indexCustomer, int rowIndexEth)
 {
-    m_customers[indexCustomer.row()]->removeEthernetAddress(rowIndexEth);
+    m_customers[indexCustomer.row()]->removeComputerId(rowIndexEth);
     saveInSettings();
 }
 
-void CustomerTableModel::addEthernetAddress(
-        const QModelIndex &indexCustomer, const QString &ethernetAddress)
+void CustomerTableModel::addComputerId(
+        const QModelIndex &indexCustomer, const QString &computerId)
 {
-    m_customers[indexCustomer.row()]->addEthernetAddress(ethernetAddress);
+    m_customers[indexCustomer.row()]->addComputerId(computerId);
     saveInSettings();
 }
 
-void CustomerTableModel::replaceEthernetAddress(
+void CustomerTableModel::replaceComputerId(
         const QModelIndex &indexCustomer,
-        int rowIndexEth,
-        const QString &ethernetAddressAfter)
+        int rowIndexId,
+        const QString &computerIdAfter)
 {
-    m_customers[indexCustomer.row()]->replaceEthernetAddress(
-                rowIndexEth, ethernetAddressAfter);
+    m_customers[indexCustomer.row()]->replaceComputerId(
+                rowIndexId, computerIdAfter);
     saveInSettings();
 }
 
@@ -214,34 +217,63 @@ Qt::ItemFlags CustomerTableModel::flags(const QModelIndex &index) const
 QHash<QString, QDate> CustomerTableModel::readMacAddresses() const
 {
     QSettings settings{m_settingsFilePath, QSettings::IniFormat};
-    bool continas = settings.contains(KEY_SETTINGS_CUSTOMER_MAC_ADDRESSES);
+    bool continas = settings.contains(KEY_SETTINGS_CUSTOMER_COMPUTER_IDS);
     return settings.value(
-                KEY_SETTINGS_CUSTOMER_MAC_ADDRESSES,
+                KEY_SETTINGS_CUSTOMER_COMPUTER_IDS,
                 QVariant::fromValue(QHash<QString, QDate>{})).value<QHash<QString, QDate>>();
 }
 
-QString CustomerTableModel::ethernetAddress()
+QString CustomerTableModel::getMachineUUIDWindows()
 {
-    QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
-    for (const QNetworkInterface &interface : interfaces)
+    QProcess process;
+    process.start("wmic csproduct get uuid");
+    process.waitForFinished();
+    QString output = QString::fromLocal8Bit(process.readAllStandardOutput());
+    QStringList lines = output.split('\n');
+    if (lines.size() > 1)
     {
-        if  (!interface.flags().testFlag(QNetworkInterface::IsLoopBack))
-        {
-            bool valid = interface.isValid();
-            if (valid)
-            {
-                auto hardwardAddress = interface.hardwareAddress();
-                if (!hardwardAddress.contains("00:00:00"))
-                {
-                    return hardwardAddress;
-                }
-            }
-        }
-        //}
+        return lines.at(1).trimmed();
     }
-    return QString{};
+    return QString();
 }
 
+QString CustomerTableModel::getLinuxMachineId()
+{
+    QFile file("/etc/machine-id");
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        return QString();
+    }
+
+    QString id = QString(file.readLine()).trimmed();
+    file.close();
+    return id;
+}
+
+QString CustomerTableModel::getMacOSHardwareUUID() {
+    QProcess process;
+    process.start("ioreg", {"-rd1", "-c", "IOPlatformExpertDevice"});
+    process.waitForFinished();
+    QString output = process.readAllStandardOutput();
+
+    QRegularExpression regex(R"(\"IOPlatformUUID\" = \"(.+)\")");
+    QRegularExpressionMatch match = regex.match(output);
+
+    return match.hasMatch() ? match.captured(1) : QString();
+}
+
+QString CustomerTableModel::getUniqueMachineIdentifier()
+{
+#ifdef Q_OS_WIN
+    return getWindowsMachineUUID();
+#elif defined(Q_OS_MAC)
+    return getMacOSHardwareUUID();
+#elif defined(Q_OS_LINUX)
+    return getLinuxMachineId();
+#else
+    return QString();
+#endif
+}
 
 void CustomerTableModel::saveInSettings()
 {
@@ -254,10 +286,10 @@ void CustomerTableModel::saveInSettings()
     settingsLocal.setValue(KEY_SETTINGS_CUSTOMERS, QVariant::fromValue(customers));
 
     QSettings settings{m_settingsFilePath, QSettings::IniFormat};
-    QHash<QString, QDate> allEthernetAddresses;
+    QHash<QString, QDate> allComputerIds;
     for (const auto &customer : m_customers)
     {
-        const auto &addresses = customer->ethernetAddresses().stringList();
+        const auto &addresses = customer->computerUniqueIds().stringList();
         QDate endDate = customer->dateLastPayment().addYears(1);
         if (customer->foreverAccess())
         {
@@ -267,12 +299,12 @@ void CustomerTableModel::saveInSettings()
         {
             for (const auto &ethAddress : addresses)
             {
-                allEthernetAddresses.insert(ethAddress, endDate);
+                allComputerIds.insert(ethAddress, endDate);
             }
         }
     }
-    settings.setValue(KEY_SETTINGS_CUSTOMER_MAC_ADDRESSES,
-                       QVariant::fromValue(allEthernetAddresses));
+    settings.setValue(KEY_SETTINGS_CUSTOMER_COMPUTER_IDS,
+                       QVariant::fromValue(allComputerIds));
 }
 
 void CustomerTableModel::loadFromSettings()
@@ -290,15 +322,22 @@ void CustomerTableModel::loadFromSettings()
 
 void CustomerTableModel::_connectCustomer(Customer *customer)
 {
-    connect(&customer->ethernetAddresses(),
+    connect(&customer->computerUniqueIds(),
             &QStringListModel::dataChanged,
             this, [this](){
         saveInSettings();
     });
 }
-bool CustomerTableModel::isEthernetAddressAllowed() const
+bool CustomerTableModel::isComputerIdAllowed() const
 {
     const auto &allowedAddresses = readMacAddresses();
+    const auto &uniqueManchineId = getUniqueMachineIdentifier();
+    auto it = allowedAddresses.find(uniqueManchineId);
+    if (it != allowedAddresses.end() && it.value() >= QDate::currentDate())
+    {
+        return true;
+    }
+    /*
     QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
     for (const QNetworkInterface &interface : interfaces)
     {
@@ -311,12 +350,17 @@ bool CustomerTableModel::isEthernetAddressAllowed() const
             }
         }
     }
+    //*/
     return false;
 }
 
-bool CustomerTableModel::wasEthernetAddressAllowed() const
+bool CustomerTableModel::wasComputerIdAllowed() const
 {
     const auto &allowedAddresses = readMacAddresses();
+    const auto &uniqueManchineId = getUniqueMachineIdentifier();
+    auto it = allowedAddresses.find(uniqueManchineId);
+    return  it != allowedAddresses.end();
+    /*
     QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
     for (const QNetworkInterface &interface : interfaces)
     {
@@ -330,5 +374,6 @@ bool CustomerTableModel::wasEthernetAddressAllowed() const
         }
     }
     return false;
+    //*/
 }
 

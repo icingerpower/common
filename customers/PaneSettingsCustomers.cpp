@@ -34,18 +34,18 @@ void PaneSettingsCustomers::_connectSlots()
             &QPushButton::clicked,
             this,
             &PaneSettingsCustomers::searchReset);
-    connect(ui->buttonAddEthAddress,
+    connect(ui->buttonAddComputerId,
             &QPushButton::clicked,
             this,
-            &PaneSettingsCustomers::addEthernetAddress);
-    connect(ui->buttonRemoveEthAddress,
+            &PaneSettingsCustomers::addComputerId);
+    connect(ui->buttonRemoveComputerId,
             &QPushButton::clicked,
             this,
-            &PaneSettingsCustomers::removeEthernetAddress);
-    connect(ui->buttonReplaceEthernetAddress,
+            &PaneSettingsCustomers::removeComputerId);
+    connect(ui->buttonReplaceComputerId,
             &QPushButton::clicked,
             this,
-            &PaneSettingsCustomers::replaceEthernetAddress);
+            &PaneSettingsCustomers::replaceComputerId);
     connect(ui->tableViewCustomers->selectionModel(),
             &QItemSelectionModel::selectionChanged,
             this,
@@ -132,18 +132,18 @@ void PaneSettingsCustomers::searchReset()
     }
 }
 
-void PaneSettingsCustomers::addEthernetAddress()
+void PaneSettingsCustomers::addComputerId()
 {
     const auto &selIndexes = ui->tableViewCustomers->selectionModel()->selectedIndexes();
     if (selIndexes.size() > 0)
     {
-        const QString &ethernet = QInputDialog::getText(
-                    this, tr("Ethernet address"), tr("Enter the ethernet address"));
-        if (!ethernet.isEmpty())
+        const QString &computerId = QInputDialog::getText(
+                    this, tr("Computer ID"), tr("Enter the computer ID"));
+        if (!computerId.isEmpty())
         {
-            m_customerTableModel->addEthernetAddress(
+            m_customerTableModel->addComputerId(
                         selIndexes.first(),
-                        ethernet);
+                        computerId);
         }
     }
     else
@@ -155,30 +155,30 @@ void PaneSettingsCustomers::addEthernetAddress()
     }
 }
 
-void PaneSettingsCustomers::replaceEthernetAddress()
+void PaneSettingsCustomers::replaceComputerId()
 {
     const auto &selIndexes = ui->tableViewCustomers->selectionModel()->selectedIndexes();
     if (selIndexes.size() > 0)
     {
-        auto selEthernets = ui->listViewIps->selectionModel()->selectedIndexes();
-        if (selEthernets.size() > 0)
+        auto selComputerIds = ui->listViewIps->selectionModel()->selectedIndexes();
+        if (selComputerIds.size() > 0)
         {
-            const QString &newEthernet = QInputDialog::getText(
-                        this, tr("Ethernet address"), tr("Enter the ethernet address"));
-            if (!newEthernet.isEmpty())
+            const QString &newComputerId = QInputDialog::getText(
+                        this, tr("Computer ID"), tr("Enter the computer ID"));
+            if (!newComputerId.isEmpty())
             {
-                m_customerTableModel->replaceEthernetAddress(
+                m_customerTableModel->replaceComputerId(
                             selIndexes.first(),
-                            selEthernets.first().row(),
-                            newEthernet);
+                            selComputerIds.first().row(),
+                            newComputerId);
             }
         }
         else
         {
             QMessageBox::information(
                         this,
-                        tr("No ethernet address"),
-                        tr("You need to select an ethernet address"));
+                        tr("No computer ID"),
+                        tr("You need to select a computer ID"));
         }
     }
     else
@@ -190,25 +190,25 @@ void PaneSettingsCustomers::replaceEthernetAddress()
     }
 }
 
-void PaneSettingsCustomers::removeEthernetAddress()
+void PaneSettingsCustomers::removeComputerId()
 {
-    auto selEthernets = ui->listViewIps->selectionModel()->selectedIndexes();
-    if (selEthernets.size() > 0)
+    auto selComputerIds = ui->listViewIps->selectionModel()->selectedIndexes();
+    if (selComputerIds.size() > 0)
     {
         const auto &selIndexes = ui->tableViewCustomers->selectionModel()->selectedIndexes();
         if (selIndexes.size() > 0)
         {
-            m_customerTableModel->removeEthernetAddress(
+            m_customerTableModel->removeComputerId(
                         selIndexes.first(),
-                        selEthernets.first().row());
+                        selComputerIds.first().row());
         }
     }
     else
     {
         QMessageBox::information(
                     this,
-                    tr("No ethernet address"),
-                    tr("You need to select an ethernet address"));
+                    tr("No computer ID"),
+                    tr("You need to select a computer ID"));
     }
 }
 
@@ -217,18 +217,18 @@ void PaneSettingsCustomers::selectCustomer(
 {
     if (selected.size() > 0)
     {
-        auto &ethernetModel = m_customerTableModel->getEthernetAddresses(
+        auto &computerIdModel = m_customerTableModel->getComputerIds(
                     selected.indexes().first());
-        ui->listViewIps->setModel(&ethernetModel);
+        ui->listViewIps->setModel(&computerIdModel);
         static QSet<QStringListModel *> connected;
-        if (!connected.contains(&ethernetModel))
+        if (!connected.contains(&computerIdModel))
         {
-            connect(&ethernetModel,
+            connect(&computerIdModel,
                     &QStringListModel::dataChanged,
                     this, [](){
 
             });
-            connected.insert(&ethernetModel);
+            connected.insert(&computerIdModel);
         }
     }
 }

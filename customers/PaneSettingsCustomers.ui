@@ -83,23 +83,23 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_4">
          <item>
-          <widget class="QPushButton" name="buttonAddEthAddress">
+          <widget class="QPushButton" name="buttonAddComputerId">
            <property name="text">
-            <string>Add Ethernet Address</string>
+            <string>Add computer ID</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="buttonReplaceEthernetAddress">
+          <widget class="QPushButton" name="buttonReplaceComputerId">
            <property name="text">
-            <string>Replace ethernet address</string>
+            <string>Replace computer ID</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="buttonRemoveEthAddress">
+          <widget class="QPushButton" name="buttonRemoveComputerId">
            <property name="text">
-            <string>Remove Ethernet Address</string>
+            <string>Remove computer ID</string>
            </property>
           </widget>
          </item>
