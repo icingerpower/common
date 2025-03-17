@@ -265,7 +265,7 @@ QString CustomerTableModel::getMacOSHardwareUUID() {
 QString CustomerTableModel::getUniqueMachineIdentifier()
 {
 #ifdef Q_OS_WIN
-    return getWindowsMachineUUID();
+    return getMachineUUIDWindows();
 #elif defined(Q_OS_MAC)
     return getMacOSHardwareUUID();
 #elif defined(Q_OS_LINUX)
