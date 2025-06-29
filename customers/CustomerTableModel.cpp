@@ -223,57 +223,160 @@ QHash<QString, QDate> CustomerTableModel::readMacAddresses() const
                 QVariant::fromValue(QHash<QString, QDate>{})).value<QHash<QString, QDate>>();
 }
 
-QString CustomerTableModel::getMachineUUIDWindows()
+QString CustomerTableModel::getUniqueMachineIdentifier()
 {
-    QProcess process;
-    process.start("wmic csproduct get uuid");
-    process.waitForFinished();
-    QString output = QString::fromLocal8Bit(process.readAllStandardOutput());
-    QStringList lines = output.split('\n');
-    if (lines.size() > 1)
-    {
-        return lines.at(1).trimmed();
-    }
-    return QString();
-}
+    QString id;
 
-QString CustomerTableModel::getLinuxMachineId()
-{
-    QFile file("/etc/machine-id");
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        return QString();
-    }
+#ifdef Q_OS_WIN
+    // 1) Registry MachineGuid
+    id = getWindowsMachineGuid();
+    // 2) WMIC UUID
+    if (id.isEmpty()) id = getWindowsWmicUuid();
 
-    QString id = QString(file.readLine()).trimmed();
-    file.close();
+#elif defined(Q_OS_MAC)
+    // 1) IOKit IOPlatformUUID
+    id = getMacIOPlatformUUID();
+    // 2) system_profiler Serial
+    if (id.isEmpty()) id = getMacSystemProfilerSerial();
+
+#elif defined(Q_OS_LINUX)
+    // 1) /etc/machine-id
+    id = getLinuxMachineId("/etc/machine-id");
+    // 2) /var/lib/dbus/machine-id
+    if (id.isEmpty()) id = getLinuxMachineId("/var/lib/dbus/machine-id");
+
+#else
+    id.clear();
+#endif
+
+    // 3) Last resort: first non‐empty hardware MAC
+    if (id.isEmpty()) id = getFirstHardwareMac();
+
     return id;
 }
 
-QString CustomerTableModel::getMacOSHardwareUUID() {
-    QProcess process;
-    process.start("ioreg", {"-rd1", "-c", "IOPlatformExpertDevice"});
-    process.waitForFinished();
-    QString output = process.readAllStandardOutput();
-
-    QRegularExpression regex(R"(\"IOPlatformUUID\" = \"(.+)\")");
-    QRegularExpressionMatch match = regex.match(output);
-
-    return match.hasMatch() ? match.captured(1) : QString();
-}
-
-QString CustomerTableModel::getUniqueMachineIdentifier()
-{
+// ——————————————————————————————————————————————
+// Windows methods
+// ——————————————————————————————————————————————
 #ifdef Q_OS_WIN
-    return getMachineUUIDWindows();
-#elif defined(Q_OS_MAC)
-    return getMacOSHardwareUUID();
-#elif defined(Q_OS_LINUX)
-    return getLinuxMachineId();
-#else
-    return QString();
-#endif
+#include <windows.h>
+#include <winreg.h>
+QString CustomerTableModel::getWindowsMachineGuid()
+{
+    HKEY hKey = nullptr;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
+                      L"SOFTWARE\\Microsoft\\Cryptography",
+                      0, KEY_READ | KEY_WOW64_64KEY, &hKey) != ERROR_SUCCESS)
+        return {};
+
+    WCHAR buf[256];
+    DWORD bufSize = sizeof(buf);
+    if (RegQueryValueExW(hKey, L"MachineGuid", nullptr, nullptr,
+                         (LPBYTE)buf, &bufSize) != ERROR_SUCCESS)
+    {
+        RegCloseKey(hKey);
+        return {};
+    }
+    RegCloseKey(hKey);
+    return QString::fromWCharArray(buf);
 }
+
+QString CustomerTableModel::getWindowsWmicUuid()
+{
+    QProcess p;
+    p.start("wmic", QStringList() << "csproduct" << "get" << "uuid");
+    p.waitForFinished();
+    const auto out = QString::fromLocal8Bit(p.readAllStandardOutput())
+                        .split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    return (out.size() >= 2) ? out.at(1).trimmed() : QString();
+}
+#endif
+
+// ——————————————————————————————————————————————
+// macOS methods
+// ——————————————————————————————————————————————
+#ifdef Q_OS_MAC
+QString CustomerTableModel::getMacIOPlatformUUID()
+{
+    QProcess p;
+    p.start("ioreg", QStringList() << "-rd1" << "-c" << "IOPlatformExpertDevice");
+    p.waitForFinished();
+    const auto output = p.readAllStandardOutput();
+    QRegularExpression re(R"("IOPlatformUUID"\s*=\s*"(.+)")");
+    auto m = re.match(output);
+    return m.hasMatch() ? m.captured(1) : QString();
+}
+
+QString CustomerTableModel::getMacSystemProfilerSerial()
+{
+    QProcess p;
+    p.start("system_profiler", QStringList() << "SPHardwareDataType");
+    p.waitForFinished();
+    const auto out = QString::fromLocal8Bit(p.readAllStandardOutput())
+                          .split('\n');
+    for (auto &line : out) {
+        if (line.contains("Serial Number", Qt::CaseInsensitive)) {
+            auto parts = line.split(':');
+            if (parts.size() == 2) return parts[1].trimmed();
+        }
+    }
+    return {};
+}
+#endif
+
+// ——————————————————————————————————————————————
+// Linux methods
+// ——————————————————————————————————————————————
+#ifdef Q_OS_LINUX
+QString CustomerTableModel::getLinuxMachineId(const QString &path)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly|QIODevice::Text)) return {};
+    const auto id = QString::fromUtf8(f.readLine()).trimmed();
+    f.close();
+    return id;
+}
+#endif
+
+// ——————————————————————————————————————————————
+// Fallback: first non‐empty MAC
+// ——————————————————————————————————————————————
+QString CustomerTableModel::getFirstHardwareMac()
+{
+    static const QStringList virtualPrefixes = {
+        "veth",   // Docker, Linux bridges
+        "docker",
+        "virbr",  // libvirt
+        "vmnet",  // VMware
+        "vboxnet" // VirtualBox
+    };
+
+    for (const QNetworkInterface &iface : QNetworkInterface::allInterfaces()) {
+        // must be up, non-loopback, have a hardware address
+        if (!iface.flags().testFlag(QNetworkInterface::IsUp) ||
+            iface.flags().testFlag(QNetworkInterface::IsLoopBack) ||
+            iface.hardwareAddress().isEmpty()) {
+            continue;
+        }
+
+        // optional: skip known virtual NIC name prefixes
+        bool isVirtualName = false;
+        for (const QString &pfx : virtualPrefixes) {
+            if (iface.name().startsWith(pfx, Qt::CaseInsensitive)) {
+                isVirtualName = true;
+                break;
+            }
+        }
+        if (isVirtualName)
+            continue;
+
+        // return the MAC without separators
+        return iface.hardwareAddress().replace(":", "");
+    }
+
+    return QString();
+}
+
 
 void CustomerTableModel::saveInSettings()
 {

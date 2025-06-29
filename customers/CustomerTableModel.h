@@ -65,9 +65,28 @@ private:
     void _connectCustomer(Customer *customer);
     QString m_settingsFilePath;
     QString m_settingsFilePathSecret;
-    static QString getMacOSHardwareUUID();
-    static QString getLinuxMachineId();
-    static QString getMachineUUIDWindows();
+
+#ifdef Q_OS_WIN
+    // #1 Windows registry MachineGuid
+    static QString getWindowsMachineGuid();
+    // #2 WMIC csproduct UUID
+    static QString getWindowsWmicUuid();
+#endif
+
+#ifdef Q_OS_MAC
+    // #1 IOKit IOPlatformUUID
+    static QString getMacIOPlatformUUID();
+    // #2 system_profiler serial number
+    static QString getMacSystemProfilerSerial();
+#endif
+
+#ifdef Q_OS_LINUX
+    // Read a Linux machine-id file
+    static QString getLinuxMachineId(const QString& path);
+#endif
+
+    // #3 Fallback: first non‐loopback, non‐virtual NIC MAC (without colons)
+    static QString getFirstHardwareMac();
 };
 
 #endif // CUSTOMERTABLEMODEL_H
