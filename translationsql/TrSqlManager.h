@@ -26,13 +26,13 @@ public:
     int nextPosition(const QString &langFrom) const;
     void translateUsingGoogleApi(const QStringList &texts, const QString &langFrom, const QString &langTo);
     void translateUsingGoogleApi(const QStringList &texts, const QString &langFrom, const QStringList &langsTo);
+    QSqlDatabase getDatabaseOpened(const QString &langFrom) const;
 
 
 private:
     QDir m_workingDirectory;
     static const QString COL_COUNT;
 
-    QSqlDatabase getDatabaseOpened(const QString &langFrom) const;
     QString nameDataBase(const QString &langFrom) const;
     QString filePathDataBase(const QString &langFrom) const;
     QString m_lastLangOfDb; // The last lang of the database opened so if a same database is read several time, it will be opened once only

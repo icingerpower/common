@@ -40,7 +40,6 @@ QDataStream & operator >> (
     return stream;
 }
 //----------------------------------------
-//----------------------------------------
 QDataStream & operator << (
         QDataStream &stream, const QList<QList<QVariant>> &listOfVariantList)
 {
