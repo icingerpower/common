@@ -357,7 +357,8 @@ QStringList CsvReader::decodeLine(QTextStream &stream) const
 //*/
 //*
 //----------------------------------------------------------
-QStringList CsvReader::decodeLine(QTextStream &stream, QString &bufferNext) const
+QStringList CsvReader::decodeLine(
+        QTextStream &stream, QString &bufferNext) const
 {
     QStringList elements;
     QString element;
@@ -448,6 +449,9 @@ QStringList CsvReader::decodeLine(QTextStream &stream, QString &bufferNext) cons
             return elements;
         } else if (!inGuill && element.endsWith(m_sep)) {
             element.remove(element.size() - m_sep.size(), m_sep.size());
+            elements << element;
+            element.clear();
+        } else if (!inGuill && bufferNext.isEmpty()) {
             elements << element;
             element.clear();
         }
