@@ -378,14 +378,11 @@ QDataStream & operator << (
         QDataStream &stream,
         const QHash<QString, QHash<QString, double>> &hashOfHashDouble)
 {
-    QStringList keys1 = hashOfHashDouble.keys();
+    const QStringList &keys1 = hashOfHashDouble.keys();
     stream << keys1;
-    QStringList keys2;
-    if (keys1.size() > 0) {
-        keys2 = hashOfHashDouble[keys1[0]].keys();
-    }
-    stream << keys2;
     for (auto itLine=hashOfHashDouble.begin(); itLine!=hashOfHashDouble.end(); ++itLine) {
+        const QStringList &keys2 = itLine->keys();
+        stream << keys2;
         for (auto itElement = itLine.value().begin();
              itElement != itLine.value().end(); ++itElement) {
             //stream << QString::number(itElement.value(), 'f', 2);
@@ -401,10 +398,10 @@ QDataStream & operator >> (
 {
     QStringList keys1;
     stream >> keys1;
-    QStringList keys2;
-    stream >> keys2;
     for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1) {
         hashOfHashDouble[*itKey1] = QHash<QString, double>();
+        QStringList keys2;
+        stream >> keys2;
         for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2) {
             /*
             QString valueStr;
@@ -421,6 +418,46 @@ QDataStream & operator >> (
     }
     return stream;
 }
+//----------------------------------------
+//----------------------------------------
+QDataStream & operator << (QDataStream &stream,
+                        const QHash<QString, QHash<QString, QVariant>> &hashOfHashVariant)
+{
+    const QStringList &keys1 = hashOfHashVariant.keys();
+    stream << keys1;
+    for (auto itLine=hashOfHashVariant.begin(); itLine!=hashOfHashVariant.end(); ++itLine)
+    {
+        const QStringList &keys2 = itLine->keys();
+        stream << keys2;
+        for (auto itElement = itLine.value().begin();
+             itElement != itLine.value().end(); ++itElement)
+        {
+            stream << itElement.value();
+        }
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream,
+                        QHash<QString, QHash<QString, QVariant>> &hashOfHashVariant)
+{
+    QStringList keys1;
+    stream >> keys1;
+    for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1)
+    {
+        hashOfHashVariant[*itKey1] = QHash<QString, QVariant>();
+        QStringList keys2;
+        stream >> keys2;
+        for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2)
+        {
+            QVariant value;
+            stream >> value;
+            hashOfHashVariant[*itKey1][*itKey2] = value;
+        }
+    }
+    return stream;
+}
+//----------------------------------------
 //----------------------------------------
 QDataStream & operator << (
         QDataStream &stream,

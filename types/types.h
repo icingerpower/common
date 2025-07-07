@@ -58,6 +58,9 @@ QDataStream & operator >> (QDataStream &stream, QList<QHash<QString, QVariant>> 
 QDataStream & operator << (QDataStream &stream, const QHash<QString, QHash<QString, double>> &hashOfHashDouble);
 QDataStream & operator >> (QDataStream &stream, QHash<QString, QHash<QString, double>> &hashOfHashDouble);
 
+QDataStream & operator << (QDataStream &stream, const QHash<QString, QHash<QString, QVariant>> &hashOfHashVariant);
+QDataStream & operator >> (QDataStream &stream, QHash<QString, QHash<QString, QVariant>> &hashOfHashVariant);
+
 QDataStream & operator << (QDataStream &stream, const QHash<QString, QMap<QDate, QHash<QString, double>>> &hashOfMapOfHashDouble);
 QDataStream & operator >> (QDataStream &stream, QHash<QString, QMap<QDate, QHash<QString, double>>> &hashOfMapOfHashDouble);
 
