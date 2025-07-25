@@ -302,7 +302,7 @@ QString CustomerTableModel::getMacIOPlatformUUID()
     p.start("ioreg", QStringList() << "-rd1" << "-c" << "IOPlatformExpertDevice");
     p.waitForFinished();
     const auto output = p.readAllStandardOutput();
-    QRegularExpression re(R"("IOPlatformUUID"\s*=\s*"(.+)")");
+    static QRegularExpression re(R"("IOPlatformUUID"\s*=\s*"(.+)")");
     auto m = re.match(output);
     return m.hasMatch() ? m.captured(1) : QString();
 }
@@ -436,9 +436,12 @@ bool CustomerTableModel::isComputerIdAllowed() const
     const auto &allowedAddresses = readMacAddresses();
     const auto &uniqueManchineId = getUniqueMachineIdentifier();
     auto it = allowedAddresses.find(uniqueManchineId);
-    if (it != allowedAddresses.end() && it.value() >= QDate::currentDate())
+    if (it != allowedAddresses.end())
     {
-        return true;
+        if (it.value() >= QDate::currentDate())
+        {
+            return true;
+        }
     }
     /*
     QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
