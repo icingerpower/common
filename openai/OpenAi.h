@@ -33,9 +33,9 @@ public:
     void askQuestion(
         const QString& question,
         const QString& cachingKey,
-        std::function<bool(QString& json)> callbackTryProcessReply,  // return true = accepted
-        std::function<void(QString& json)> callbackReplySuccess,     // executed on caller thread
-        std::function<void(QString& json)> callbackReplyFailure,     // executed on caller thread, gets last reply or error json
+        std::function<bool(const QString& json)> callbackTryProcessReply,  // return true = accepted
+        std::function<void(const QString& json)> callbackReplySuccess,     // executed on caller thread
+        std::function<void(const QString& json)> callbackReplyFailure,     // executed on caller thread, gets last reply or error json
         int nMaxRetryOnReplyFailed,
         const QString& model = "gpt-4.1-mini");
 
@@ -44,9 +44,9 @@ public:
         const QString& question,
         const QImage& image,
         const QString& cachingKey,
-        std::function<bool(QString& json)> callbackTryProcessReply,
-        std::function<void(QString& json)> callbackReplySuccess,
-        std::function<void(QString& json)> callbackReplyFailure,
+        std::function<bool(const QString& json)> callbackTryProcessReply,
+        std::function<void(const QString& json)> callbackReplySuccess,
+        std::function<void(const QString& json)> callbackReplyFailure,
         int nMaxRetryOnReplyFailed,
         const QString& model = "gpt-4.1-mini");
 
@@ -75,9 +75,9 @@ private:
     struct InFlight {
         QString id, model, cachingKey, question;
         QByteArray imagePngBase64; // empty if no image
-        std::function<bool(QString&)> cbTry;
-        std::function<void(QString&)> cbSuccess;
-        std::function<void(QString&)> cbFailure;
+        std::function<bool(const QString&)> cbTry;
+        std::function<void(const QString&)> cbSuccess;
+        std::function<void(const QString&)> cbFailure;
         int semanticRetriesLeft = 0; // retry on "bad" model reply
         int attempt = 0;             // transport retries
         QNetworkReply* reply = nullptr;
@@ -90,9 +90,9 @@ private:
     struct Pending {
         QString question, cachingKey, model;
         QImage image;
-        std::function<bool(QString&)> cbTry;
-        std::function<void(QString&)> cbSuccess;
-        std::function<void(QString&)> cbFailure;
+        std::function<bool(const QString&)> cbTry;
+        std::function<void(const QString&)> cbSuccess;
+        std::function<void(const QString&)> cbFailure;
         int semanticRetries = 0;
     };
 

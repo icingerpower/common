@@ -83,9 +83,9 @@ QString OpenAi::cachedPrefix(const QString& cachingKey) const { return m_cachedP
 void OpenAi::askQuestion(
     const QString& question,
     const QString& cachingKey,
-    std::function<bool(QString& json)> callbackTryProcessReply,
-    std::function<void(QString& json)> callbackReplySuccess,
-    std::function<void(QString& json)> callbackReplyFailure,
+    std::function<bool(const QString& json)> callbackTryProcessReply,
+    std::function<void(const QString& json)> callbackReplySuccess,
+    std::function<void(const QString& json)> callbackReplyFailure,
     int nMaxRetryOnReplyFailed,
     const QString& model)
 {
@@ -107,9 +107,9 @@ void OpenAi::askQuestion(
     const QString& question,
     const QImage& image,
     const QString& cachingKey,
-    std::function<bool(QString& json)> callbackTryProcessReply,
-    std::function<void(QString& json)> callbackReplySuccess,
-    std::function<void(QString& json)> callbackReplyFailure,
+    std::function<bool(const QString& json)> callbackTryProcessReply,
+    std::function<void(const QString& json)> callbackReplySuccess,
+    std::function<void(const QString& json)> callbackReplyFailure,
     int nMaxRetryOnReplyFailed,
     const QString& model)
 {
@@ -367,7 +367,8 @@ void OpenAi::_finalize(InFlight* ctx, bool ok, const QString& err)
     }
 
     if (!ok) {
-        ExceptionOpenAiError ex; ex.setError(err); ex.raise();
+        ctx->cbFailure(err);
+        //ExceptionOpenAiError ex; ex.setError(err); ex.raise();
     }
     delete ctx;
 }
