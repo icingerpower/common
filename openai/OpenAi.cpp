@@ -9,7 +9,6 @@
 #include <QUuid>
 
 #include "ExceptionOpenAiNotInitialized.h"
-#include "ExceptionOpenAiError.h"
 
 #include "OpenAi.h"
 
@@ -29,7 +28,6 @@
 
 #include "OpenAi.h"
 #include "ExceptionOpenAiNotInitialized.h"
-#include "ExceptionOpenAiError.h"
 
 const QString OpenAi::KEY_OPEN_AI_API_KEY = "open-ai-api-key";
 const QUrl OpenAi::RESPONSES_URL("https://api.openai.com/v1/responses");
@@ -46,7 +44,9 @@ OpenAi* OpenAi::instance() {
     return &inst;
 }
 
-bool OpenAi::isInitiatized() const { return m_initialized; }
+bool OpenAi::isInitiatized() const {
+    return m_initialized;
+}
 
 void OpenAi::init(const QString &openAiKey) {
     m_openAiKey = openAiKey;
@@ -60,16 +60,37 @@ void OpenAi::_raiseExceptionIfNotInitialized() {
 }
 
 // -------- throughput controls ----------
-void OpenAi::setMaxInFlight(int n) { m_maxInFlight = qMax(1, n); _scheduleDispatch(0); }
-void OpenAi::setMinSpacingMs(int ms) { m_minSpacingMs = qMax(0, ms); }
-int  OpenAi::maxInFlight() const { return m_maxInFlight; }
-int  OpenAi::minSpacingMs() const { return m_minSpacingMs; }
+void OpenAi::setMaxInFlight(int n)
+{
+    m_maxInFlight = qMax(1, n); _scheduleDispatch(0);
+}
+
+void OpenAi::setMinSpacingMs(int ms)
+{
+    m_minSpacingMs = qMax(0, ms);
+}
+
+int  OpenAi::maxInFlight() const
+{
+    return m_maxInFlight;
+}
+
+int  OpenAi::minSpacingMs() const
+{
+    return m_minSpacingMs;
+}
 
 // -------- timeouts/retries -------------
 int  OpenAi::maxRetries() const { return m_maxRetries; }
-void OpenAi::setMaxRetries(int newMaxRetries) { m_maxRetries = qMax(0, newMaxRetries); }
+void OpenAi::setMaxRetries(int newMaxRetries)
+{
+    m_maxRetries = qMax(0, newMaxRetries);
+}
 int  OpenAi::timeoutMs() const { return m_timeoutMs; }
-void OpenAi::setTimeoutMs(int newTimeoutMs) { m_timeoutMs = qMax(1000, newTimeoutMs); }
+void OpenAi::setTimeoutMs(int newTimeoutMs)
+{
+    m_timeoutMs = qMax(1000, newTimeoutMs);
+}
 
 // -------- prompt caching ---------------
 void OpenAi::setCachedPrefix(const QString& cachingKey, const QString& prefixText) {
@@ -95,9 +116,9 @@ void OpenAi::askQuestion(
     p.cachingKey = cachingKey;
     p.model = model;
     p.image = QImage();
-    p.cbTry = std::move(callbackTryProcessReply);
-    p.cbSuccess = std::move(callbackReplySuccess);
-    p.cbFailure = std::move(callbackReplyFailure);
+    p.callbackTry = std::move(callbackTryProcessReply);
+    p.callbackSuccess = std::move(callbackReplySuccess);
+    p.callbackFailure = std::move(callbackReplyFailure);
     p.semanticRetries = qMax(0, nMaxRetryOnReplyFailed);
     _enqueue(p);
 }
@@ -119,20 +140,22 @@ void OpenAi::askQuestion(
     p.cachingKey = cachingKey;
     p.model = model;
     p.image = image;
-    p.cbTry = std::move(callbackTryProcessReply);
-    p.cbSuccess = std::move(callbackReplySuccess);
-    p.cbFailure = std::move(callbackReplyFailure);
+    p.callbackTry = std::move(callbackTryProcessReply);
+    p.callbackSuccess = std::move(callbackReplySuccess);
+    p.callbackFailure = std::move(callbackReplyFailure);
     p.semanticRetries = qMax(0, nMaxRetryOnReplyFailed);
     _enqueue(p);
 }
 
 // -------- queueing ---------------------
-void OpenAi::_enqueue(const Pending& p) {
+void OpenAi::_enqueue(const Pending& p)
+{
     m_queue.enqueue(p);
     _scheduleDispatch(0);
 }
 
-void OpenAi::_scheduleDispatch(int delayMs) {
+void OpenAi::_scheduleDispatch(int delayMs)
+{
     if (m_dispatchScheduled) return;
     m_dispatchScheduled = true;
     QTimer::singleShot(delayMs, this, [this]{
@@ -150,19 +173,25 @@ void OpenAi::_dispatchOne() {
         ctx->model = p.model;
         ctx->cachingKey = p.cachingKey;
         ctx->question = p.question;
-        ctx->cbTry = p.cbTry;
-        ctx->cbSuccess = p.cbSuccess;
-        ctx->cbFailure = p.cbFailure;
+        ctx->callbackTry = p.callbackTry;
+        ctx->callbackSuccess = p.callbackSuccess;
+        ctx->callbackFailure = p.callbackFailure;
         ctx->semanticRetriesLeft = p.semanticRetries;
         ctx->callerThread = QThread::currentThread();
         ctx->proxy = new QObject();
         ctx->proxy->moveToThread(ctx->callerThread);
-        if (!p.image.isNull()) ctx->imagePngBase64 = _toPngBase64(p.image);
+        if (!p.image.isNull())
+        {
+            ctx->imagePngBase64 = _toPngBase64(p.image);
+        }
 
         ++m_inFlight;
         _send(ctx);
 
-        if (!m_queue.isEmpty()) { _scheduleDispatch(m_minSpacingMs); return; }
+        if (!m_queue.isEmpty())
+        {
+            _scheduleDispatch(m_minSpacingMs); return;
+        }
     }
 }
 
@@ -188,28 +217,37 @@ void OpenAi::_send(InFlight* ctx)
         ctx->timer->stop();
 
         const int http = ctx->reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        const QString retryAfter = QString::fromLatin1(ctx->reply->rawHeader("Retry-After"));
-        const QString errStr = ctx->reply->errorString();
+        const QString &retryAfter = QString::fromLatin1(ctx->reply->rawHeader("Retry-After"));
+        const QString &errStr = ctx->reply->errorString();
         ctx->lastRaw = ctx->reply->readAll();
 
-        auto parseOpenAiError = [&]() -> QString {
+        auto parseOpenAiError = [ctx, errStr]() -> QString {
             QJsonParseError perr{}; QJsonDocument d = QJsonDocument::fromJson(ctx->lastRaw, &perr);
-            if (perr.error == QJsonParseError::NoError && d.isObject()) {
+            if (perr.error == QJsonParseError::NoError && d.isObject())
+            {
                 const QJsonObject o = d.object();
-                if (o.contains("error") && o["error"].isObject()) {
+                if (o.contains("error") && o["error"].isObject())
+                {
                     const QJsonObject e = o["error"].toObject();
                     const QString em = e.value("message").toString();
                     const QString et = e.value("type").toString();
-                    if (!em.isEmpty()) return QString("[%1] %2").arg(et, em);
+                    if (!em.isEmpty())
+                    {
+                        return QString("[%1] %2").arg(et, em);
+                    }
                 }
             }
             return errStr;
         };
 
-        if (ctx->reply->error() != QNetworkReply::NoError) {
+        if (ctx->reply->error() != QNetworkReply::NoError)
+        {
             const bool retry = _shouldRetry(ctx->reply) && ctx->attempt < m_maxRetries;
             ctx->reply->deleteLater(); ctx->reply = nullptr;
-            if (retry) { _retry(ctx, retryAfter); return; }
+            if (retry)
+            {
+                _retry(ctx, retryAfter); return;
+            }
 
             QString msg = parseOpenAiError();
             if (http) msg = QString("HTTP %1 — %2").arg(http).arg(msg);
@@ -226,7 +264,8 @@ void OpenAi::_send(InFlight* ctx)
         // Parse success (Responses API)
         QJsonParseError perr{};
         QJsonDocument doc = QJsonDocument::fromJson(ctx->lastRaw, &perr);
-        if (perr.error != QJsonParseError::NoError || !doc.isObject()) {
+        if (perr.error != QJsonParseError::NoError || !doc.isObject())
+        {
             QString m = QStringLiteral("Invalid JSON response from OpenAI.");
             _postFailure(ctx, m);
             _finalize(ctx, false, m);
@@ -235,13 +274,17 @@ void OpenAi::_send(InFlight* ctx)
         const QJsonObject root = doc.object();
 
         QString outText;
-        if (root.contains("output") && root.value("output").isArray()) {
+        if (root.contains("output") && root.value("output").isArray())
+        {
             const auto outArr = root.value("output").toArray();
-            if (!outArr.isEmpty() && outArr.at(0).isObject()) {
+            if (!outArr.isEmpty() && outArr.at(0).isObject())
+            {
                 const auto o0 = outArr.at(0).toObject();
-                if (o0.contains("content") && o0.value("content").isArray()) {
+                if (o0.contains("content") && o0.value("content").isArray())
+                {
                     const auto cArr = o0.value("content").toArray();
-                    for (const auto& c : cArr) {
+                    for (const auto& c : cArr)
+                    {
                         const auto o = c.toObject();
                         if (o.value("type").toString() == "output_text")
                             outText += o.value("text").toString();
@@ -250,9 +293,12 @@ void OpenAi::_send(InFlight* ctx)
             }
         }
         if (outText.isEmpty() && root.contains("output_text"))
+        {
             outText = root.value("output_text").toString();
+        }
 
-        if (outText.isEmpty()) {
+        if (outText.isEmpty())
+        {
             QString m = QStringLiteral("Empty response from OpenAI.");
             _postFailure(ctx, m);
             _finalize(ctx, false, m);
@@ -260,18 +306,23 @@ void OpenAi::_send(InFlight* ctx)
         }
 
         // Semantic validation/retry
-        if (ctx->cbTry) {
-            QString candidate = outText; // pass by value, allow mutation in cbTry
+        if (ctx->callbackTry)
+        {
+            QString candidate = outText; // pass by value, allow mutation in callbackTry
             bool ok = false;
-            try { ok = ctx->cbTry(candidate); } catch (...) { ok = false; }
+            try { ok = ctx->callbackTry(candidate); } catch (...) { ok = false; }
 
-            if (!ok) {
-                if (ctx->semanticRetriesLeft > 0) {
+            if (!ok)
+            {
+                if (ctx->semanticRetriesLeft > 0)
+                {
                     ctx->semanticRetriesLeft--;
                     // small delay to decorrelate completions
                     QTimer::singleShot(200, this, [this, ctx]{ _send(ctx); });
                     return; // keep slot
-                } else {
+                }
+                else
+                {
                     _postFailure(ctx, candidate); // provide last bad reply
                     _finalize(ctx, false, QStringLiteral("Validation failed and retries exhausted."));
                     return;
@@ -305,7 +356,8 @@ QByteArray OpenAi::_buildBody(const InFlight* ctx) const
 
     // Cached prefix (if any) as input_text
     const bool havePrefix = !ctx->cachingKey.isEmpty() && m_cachedPrefixByKey.contains(ctx->cachingKey);
-    if (havePrefix) {
+    if (havePrefix)
+    {
         input.append(QJsonObject{
             {"role","user"},
             {"content", QJsonArray{
@@ -318,7 +370,8 @@ QByteArray OpenAi::_buildBody(const InFlight* ctx) const
     QJsonArray qContent{
         QJsonObject{{"type","input_text"},{"text", ctx->question}}
     };
-    if (!ctx->imagePngBase64.isEmpty()) {
+    if (!ctx->imagePngBase64.isEmpty())
+    {
         const QString dataUrl = _imageDataUrlFromBase64Png(ctx->imagePngBase64);
         qContent.append(QJsonObject{
             {"type","input_image"},
@@ -340,9 +393,17 @@ QByteArray OpenAi::_buildBody(const InFlight* ctx) const
 void OpenAi::_retry(InFlight* ctx, const QString& retryAfterHeader)
 {
     ctx->attempt++;
+    if (ctx->attempt > 0 && ctx->attempt % 2 == 0)
+    {
+        m_net->clearConnectionCache();
+        qDebug() << "Open Ai clraing cache after error";
+    }
     int backoffMs = 500 * (1 << (ctx->attempt - 1)); // 500, 1000, 2000...
     bool ok=false; int ra = retryAfterHeader.toInt(&ok);
-    if (ok) backoffMs = qMax(backoffMs, ra * 1000);
+    if (ok)
+    {
+        backoffMs = qMax(backoffMs, ra * 1000);
+    }
     QTimer::singleShot(backoffMs, this, [this, ctx]{ _send(ctx); });
 }
 
@@ -354,20 +415,25 @@ bool OpenAi::_shouldRetry(QNetworkReply* r) const
 
 void OpenAi::_finalize(InFlight* ctx, bool ok, const QString& err)
 {
-    if (ctx->timer) { ctx->timer->deleteLater(); ctx->timer = nullptr; }
+    if (ctx->timer)
+    {
+        ctx->timer->deleteLater(); ctx->timer = nullptr;
+    }
 
     m_inFlight = qMax(0, m_inFlight - 1);
     _scheduleDispatch(m_minSpacingMs);
 
     // Delete proxy on its own thread
-    if (ctx->proxy) {
+    if (ctx->proxy)
+    {
         QObject* proxy = ctx->proxy;
         ctx->proxy = nullptr;
         QMetaObject::invokeMethod(proxy, [proxy]{ proxy->deleteLater(); }, Qt::QueuedConnection);
     }
 
-    if (!ok) {
-        ctx->cbFailure(err);
+    if (!ok)
+    {
+        ctx->callbackFailure(err);
         //ExceptionOpenAiError ex; ex.setError(err); ex.raise();
     }
     delete ctx;
@@ -375,28 +441,34 @@ void OpenAi::_finalize(InFlight* ctx, bool ok, const QString& err)
 
 void OpenAi::_postSuccess(InFlight* ctx, const QString& text)
 {
-    if (!ctx->cbSuccess) return;
-    auto cb = ctx->cbSuccess;
+    if (!ctx->callbackSuccess)
+    {
+        return;
+    }
+    auto callback = ctx->callbackSuccess;
     QString s = text;
     if (QThread::currentThread() == ctx->callerThread) {
-        cb(s);
+        callback(s);
     } else {
-        QMetaObject::invokeMethod(ctx->proxy, [cb, s]() mutable {
-            QString x = s; cb(x);
+        QMetaObject::invokeMethod(ctx->proxy, [callback, s]() mutable {
+            QString x = s; callback(x);
         }, Qt::QueuedConnection);
     }
 }
 
 void OpenAi::_postFailure(InFlight* ctx, const QString& jsonOrErr)
 {
-    if (!ctx->cbFailure) return;
-    auto cb = ctx->cbFailure;
+    if (!ctx->callbackFailure) return;
+    auto callback = ctx->callbackFailure;
     QString s = jsonOrErr;
-    if (QThread::currentThread() == ctx->callerThread) {
-        cb(s);
-    } else {
-        QMetaObject::invokeMethod(ctx->proxy, [cb, s]() mutable {
-            QString x = s; cb(x);
+    if (QThread::currentThread() == ctx->callerThread)
+    {
+        callback(s);
+    }
+    else
+    {
+        QMetaObject::invokeMethod(ctx->proxy, [callback, s]() mutable {
+            QString x = s; callback(x);
         }, Qt::QueuedConnection);
     }
 }

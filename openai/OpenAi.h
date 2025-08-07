@@ -75,9 +75,9 @@ private:
     struct InFlight {
         QString id, model, cachingKey, question;
         QByteArray imagePngBase64; // empty if no image
-        std::function<bool(const QString&)> cbTry;
-        std::function<void(const QString&)> cbSuccess;
-        std::function<void(const QString&)> cbFailure;
+        std::function<bool(const QString&)> callbackTry;
+        std::function<void(const QString&)> callbackSuccess;
+        std::function<void(const QString&)> callbackFailure;
         int semanticRetriesLeft = 0; // retry on "bad" model reply
         int attempt = 0;             // transport retries
         QNetworkReply* reply = nullptr;
@@ -90,9 +90,9 @@ private:
     struct Pending {
         QString question, cachingKey, model;
         QImage image;
-        std::function<bool(const QString&)> cbTry;
-        std::function<void(const QString&)> cbSuccess;
-        std::function<void(const QString&)> cbFailure;
+        std::function<bool(const QString&)> callbackTry;
+        std::function<void(const QString&)> callbackSuccess;
+        std::function<void(const QString&)> callbackFailure;
         int semanticRetries = 0;
     };
 
