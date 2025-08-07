@@ -99,7 +99,7 @@ private:
     // State
     bool m_initialized = false;
     QString m_openAiKey;
-    int m_maxRetries = 3;
+    int m_maxRetries = 7;
     int m_timeoutMs  = 100000;
     int m_maxInFlight = 8;
     int m_minSpacingMs = 100;
