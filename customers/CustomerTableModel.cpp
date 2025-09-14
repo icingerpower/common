@@ -299,11 +299,14 @@ QString CustomerTableModel::getWindowsWmicUuid()
 QString CustomerTableModel::getMacIOPlatformUUID()
 {
     QProcess p;
-    p.start("ioreg", QStringList() << "-rd1" << "-c" << "IOPlatformExpertDevice");
-    p.waitForFinished();
-    const auto output = p.readAllStandardOutput();
-    static QRegularExpression re(R"("IOPlatformUUID"\s*=\s*"(.+)")");
-    auto m = re.match(output);
+    p.start("ioreg", {"-rd1", "-c", "IOPlatformExpertDevice"});
+    if (!p.waitForFinished(5000)) return {};
+
+    const QString out = QString::fromUtf8(p.readAllStandardOutput());
+    static const QRegularExpression re(
+                R"re("IOPlatformUUID"\s*=\s*"([^"]+)")re"  // custom delimiter avoids )"
+                );
+    const auto m = re.match(out);
     return m.hasMatch() ? m.captured(1) : QString();
 }
 
