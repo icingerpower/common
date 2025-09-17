@@ -374,18 +374,54 @@ QDataStream & operator >> (QDataStream &stream,
 }
 //----------------------------------------
 //----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QHash<QString, QHash<QString, QString>> &hashOfHashString)
+{
+    const QStringList &keys1 = hashOfHashString.keys();
+    stream << keys1;
+    for (auto itLine=hashOfHashString.begin(); itLine!=hashOfHashString.end(); ++itLine) {
+        const QStringList &keys2 = itLine->keys();
+        stream << keys2;
+        for (auto itElement = itLine.value().begin();
+             itElement != itLine.value().end(); ++itElement) {
+            stream << itElement.value();
+        }
+    }
+    return stream;
+
+}
+QDataStream & operator >> (QDataStream &stream, QHash<QString, QHash<QString, QString>> &hashOfHashString)
+{
+    QStringList keys1;
+    stream >> keys1;
+    for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1)
+    {
+        hashOfHashString[*itKey1] = QHash<QString, QString>();
+        QStringList keys2;
+        stream >> keys2;
+        for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2)
+        {
+            QString value;
+            stream >> value;
+            hashOfHashString[*itKey1][*itKey2] = value;
+        }
+    }
+    return stream;
+}
+//----------------------------------------
+//----------------------------------------
 QDataStream & operator << (
         QDataStream &stream,
         const QHash<QString, QHash<QString, double>> &hashOfHashDouble)
 {
     const QStringList &keys1 = hashOfHashDouble.keys();
     stream << keys1;
-    for (auto itLine=hashOfHashDouble.begin(); itLine!=hashOfHashDouble.end(); ++itLine) {
+    for (auto itLine=hashOfHashDouble.begin(); itLine!=hashOfHashDouble.end(); ++itLine)
+    {
         const QStringList &keys2 = itLine->keys();
         stream << keys2;
         for (auto itElement = itLine.value().begin();
-             itElement != itLine.value().end(); ++itElement) {
-            //stream << QString::number(itElement.value(), 'f', 2);
+             itElement != itLine.value().end(); ++itElement)
+        {
             stream << itElement.value();
         }
     }
