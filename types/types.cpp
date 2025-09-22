@@ -154,6 +154,30 @@ QDataStream & operator >> (QDataStream &stream, QMap<QDate, int> &mapDateInt)
 }
 //----------------------------------------
 //----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QMap<QDate, double> &mapDateDouble)
+{
+    const QList<QDate> &dates = mapDateDouble.keys();
+    stream << dates;
+    const auto &values = mapDateDouble.values();
+    for (const auto &value : values)
+    {
+        stream << value;
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QMap<QDate, double> &mapDateDouble)
+{
+    QList<QDate> dates;
+    stream >> dates;
+    for (const auto &date : dates)
+    {
+        stream >> mapDateDouble[date];
+    }
+    return stream;
+}
+//----------------------------------------
+//----------------------------------------
 QDataStream & operator << (
         QDataStream &stream,
         const QSet<QString> &set)
@@ -177,6 +201,30 @@ QDataStream & operator >> (
         QString value;
         stream >> value;
         set << value;
+    }
+    return stream;
+}
+//----------------------------------------
+//----------------------------------------
+QDataStream & operator << (QDataStream &stream
+                           , const QHash<int, QDateTime> &hashOfInt_dateTime)
+{
+    QList<int> keys = hashOfInt_dateTime.keys();
+    stream << keys;
+    for (auto itPair=hashOfInt_dateTime.begin(); itPair!=hashOfInt_dateTime.end(); ++itPair) {
+        stream << itPair.value();
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream
+                           , QHash<int, QDateTime> &hashOfInt_dateTime)
+{
+    QList<int> keys;
+    stream >> keys;
+    for (auto itKey = keys.begin();
+         itKey != keys.end(); ++itKey) {
+        stream >> hashOfInt_dateTime[*itKey];
     }
     return stream;
 }
@@ -252,6 +300,29 @@ QDataStream & operator >> (
     for (auto itKey = keys.begin();
          itKey != keys.end(); ++itKey) {
         stream >> hashOfStringVariant[*itKey];
+    }
+    return stream;
+}
+//----------------------------------------
+//----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QHash<QString, QDateTime> &hashOfStringDateTime)
+{
+    const QStringList &keys = hashOfStringDateTime.keys();
+    stream << keys;
+    for (auto itPair=hashOfStringDateTime.begin();
+         itPair!=hashOfStringDateTime.end(); ++itPair) {
+        stream << itPair.value();
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QHash<QString, QDateTime> &hashOfStringDateTime)
+{
+    QStringList keys;
+    stream >> keys;
+    for (auto itKey = keys.begin();
+         itKey != keys.end(); ++itKey) {
+        stream >> hashOfStringDateTime[*itKey];
     }
     return stream;
 }
@@ -346,6 +417,30 @@ QDataStream & operator >> (QDataStream &stream, QHash<QString, QSet<QString>> &h
     for (const auto &key : keys)
     {
         stream >> hashOfStringSet[key];
+    }
+    return stream;
+}
+//----------------------------------------
+//----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QList<QMap<QDate, double>> &listOfMap_date_double)
+{
+    stream << int(listOfMap_date_double.size());
+    for (const auto &hash : listOfMap_date_double)
+    {
+        stream << hash;
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QList<QMap<QDate, double>> &listOfMap_date_double)
+{
+    int n = 0;
+    stream >> n;
+    for (int i = 0; i < n; ++i)
+    {
+        QMap<QDate, double> hash;
+        stream >> hash;
+        listOfMap_date_double << hash;
     }
     return stream;
 }
