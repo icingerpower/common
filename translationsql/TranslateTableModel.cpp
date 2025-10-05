@@ -264,7 +264,16 @@ void TranslateTableModel::pasteTranslatedText(
             {
                 if (m_listOfStringList[i][0] == lines[i])
                 {
-                    ++nSame;
+                    bool isNumber = false;
+                    m_listOfStringList[i][0].toInt(&isNumber);
+                    if (isNumber)
+                    {
+                        nSame = 0;
+                    }
+                    else
+                    {
+                        ++nSame;
+                    }
                 }
                 else
                 {
