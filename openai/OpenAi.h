@@ -7,6 +7,7 @@
 #include <QImage>
 #include <QNetworkReply>
 #include <QNetworkAccessManager>
+#include <QElapsedTimer>
 
 #include <QHash>
 #include <QQueue>
@@ -33,22 +34,22 @@ public:
     void askQuestion(
         const QString& question,
         const QString& cachingKey,
+        int nMaxRetryOnReplyFailed,
+        const QString& model,
         std::function<bool(const QString& json)> callbackTryProcessReply,  // return true = accepted
         std::function<void(const QString& json)> callbackReplySuccess,     // executed on caller thread
-        std::function<void(const QString& json)> callbackReplyFailure,     // executed on caller thread, gets last reply or error json
-        int nMaxRetryOnReplyFailed,
-        const QString& model = "gpt-4.1-mini");
+        std::function<void(const QString& json)> callbackReplyFailure);    // executed on caller thread, gets last reply or error json
 
     // With image
     void askQuestion(
         const QString& question,
         const QImage& image,
         const QString& cachingKey,
+        int nMaxRetryOnReplyFailed,
+        const QString& model,
         std::function<bool(const QString& json)> callbackTryProcessReply,
         std::function<void(const QString& json)> callbackReplySuccess,
-        std::function<void(const QString& json)> callbackReplyFailure,
-        int nMaxRetryOnReplyFailed,
-        const QString& model = "gpt-4.1-mini");
+        std::function<void(const QString& json)> callbackReplyFailure);
 
     // Throughput controls
     void setMaxInFlight(int n);   // default 8
@@ -67,6 +68,8 @@ public:
     void clearCachedPrefix(const QString& cachingKey);
     bool hasCachedPrefix(const QString& cachingKey) const;
     QString cachedPrefix(const QString& cachingKey) const;
+
+    QNetworkAccessManager* _netForAttempt(int attempt);
 
 private:
     explicit OpenAi(QObject* parent = nullptr);
@@ -99,16 +102,20 @@ private:
     // State
     bool m_initialized = false;
     QString m_openAiKey;
-    int m_maxRetries = 7;
+    QElapsedTimer m_lastSend;
+    bool m_lastSendInit = false;
+    void _sendWithPacing(InFlight* ctx, int minDelayMs); // NEW
+    int m_maxRetries = 5;
     int m_timeoutMs  = 100000;
-    int m_maxInFlight = 8;
-    int m_minSpacingMs = 100;
+    int m_maxInFlight = 1;
+    int m_minSpacingMs = 1000;
     int m_inFlight = 0;
     bool m_dispatchScheduled = false;
 
     QHash<QString, QString> m_cachedPrefixByKey;
     QQueue<Pending> m_queue;
-    QNetworkAccessManager* m_net = nullptr;
+    //QNetworkAccessManager* m_net = nullptr;
+    QHash<int, QNetworkAccessManager *> m_attempt_networkAccessManager;
 
     // Queueing
     void _enqueue(const Pending& p);
