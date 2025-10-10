@@ -265,7 +265,7 @@ void TranslateTableModel::pasteTranslatedText(
                 if (m_listOfStringList[i][0] == lines[i])
                 {
                     bool isNumber = false;
-                    m_listOfStringList[i][0].toInt(&isNumber);
+                    m_listOfStringList[i][0].trimmed().toInt(&isNumber);
                     if (isNumber)
                     {
                         nSame = 0;
@@ -282,11 +282,17 @@ void TranslateTableModel::pasteTranslatedText(
                 if (nSame == nSameMax)
                 {
                     ExceptionTranslation exception;
+                    QStringList sameLines;
+                    int begin = i - nSameMax + 1;
+                    for (int num = begin; num <= i; ++num)
+                    {
+                        sameLines << lines[num][0];
+                    }
                     exception.setTitle(tr("Missing translations"));
                     exception.setError(
                                 "Starting line "
-                                + QString::number(i+1)
-                                + " (" + lines[i]
+                                + QString::number(begin+1)
+                                + " (" + sameLines.join("\n")
                                 + ") the lines are the same");
                     exception.raise();
                 }
