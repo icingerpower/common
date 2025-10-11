@@ -1,6 +1,6 @@
 #include <QSettings>
 #include <QRandomGenerator>
-#include <QRegularExpression>
+#include <QStringLiteral>
 
 #include "ExceptionTranslation.h"
 
@@ -16,6 +16,9 @@ const QString TranslateTableModel::KEY_TEMPORARY_HEADER{"TempTranslationHeader"}
 const QString TranslateTableModel::KEY_TEMPORARY_HEADER_BACKUP{"TempTranslationBackupHeader"};
 const QString TranslateTableModel::KEY_TEMPORARY_LANGS{"TempTranslationLangs"};
 const QString TranslateTableModel::KEY_TEMPORARY_LANGS_BACKUP{"TempTranslationLangsBackup"};
+//----------------------------------------------------------
+const QRegularExpression TranslateTableModel::REGEX_NUMBER{
+    QStringLiteral(R"(^[0-9 \t]+$)")};
 //----------------------------------------------------------
 TranslateTableModel::TranslateTableModel(QObject *parent)
     : QAbstractTableModel(parent)
@@ -264,9 +267,7 @@ void TranslateTableModel::pasteTranslatedText(
             {
                 if (m_listOfStringList[i][0] == lines[i])
                 {
-                    bool isNumber = false;
-                    m_listOfStringList[i][0].trimmed().toInt(&isNumber);
-                    if (isNumber)
+                    if (REGEX_NUMBER.match(m_listOfStringList[i][0]).hasMatch())
                     {
                         nSame = 0;
                     }
@@ -286,7 +287,7 @@ void TranslateTableModel::pasteTranslatedText(
                     int begin = i - nSameMax + 1;
                     for (int num = begin; num <= i; ++num)
                     {
-                        sameLines << lines[num][0];
+                        sameLines << lines[num];
                     }
                     exception.setTitle(tr("Missing translations"));
                     exception.setError(
@@ -559,7 +560,10 @@ int TranslateTableModel::_countNumberSameAsAlreadyPasted(
             {
                 if (m_listOfStringList[j][i] == keywordsTranslated[j])
                 {
-                    ++nSameCurrent;
+                    if (!REGEX_NUMBER.match(m_listOfStringList[j][i]).hasMatch())
+                    {
+                        ++nSameCurrent;
+                    }
                 }
             }
             nSame = qMax(nSameCurrent, nSame);

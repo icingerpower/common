@@ -3,6 +3,7 @@
 
 
 #include <QAbstractTableModel>
+#include <QRegularExpression>
 #include <QDir>
 
 class TranslateTableModel : public QAbstractTableModel
@@ -10,6 +11,7 @@ class TranslateTableModel : public QAbstractTableModel
     Q_OBJECT
 
 public:
+    static const QRegularExpression REGEX_NUMBER;
     explicit TranslateTableModel(QObject *parent = nullptr);
     explicit TranslateTableModel(
             const QStringList &texts,
