@@ -8,11 +8,11 @@ DialogAddLanguage::DialogAddLanguage(QWidget *parent) :
     ui(new Ui::DialogAddLanguage)
 {
     ui->setupUi(this);
-    _loadLangages();
+    _loadLanguages();
     _connectSlots();
 }
 
-void DialogAddLanguage::_loadLangages()
+void DialogAddLanguage::_loadLanguages()
 {
     QSet<QString> codesDone;
     for (int i = QLocale::C + 1; i <= QLocale::LastLanguage; ++i) {

@@ -77,7 +77,7 @@ QVariant LangManager::headerData(int section, Qt::Orientation orientation, int r
     {
         if (orientation == Qt::Horizontal)
         {
-            static QStringList header{tr("Code"), tr("Langage")};
+            static QStringList header{tr("Code"), tr("Language")};
             return header[section];
         }
         else if (orientation == Qt::Vertical)

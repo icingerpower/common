@@ -25,7 +25,7 @@ public slots:
 private:
     Ui::DialogAddLanguage *ui;
     void _connectSlots();
-    void _loadLangages();
+    void _loadLanguages();
 };
 
 #endif // DIALOGAddLANGUAGE_H
