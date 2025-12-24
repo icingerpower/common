@@ -154,6 +154,9 @@ private:
 
     QByteArray _buildBatchJsonl(const QList<QSharedPointer<Step>>& steps, const QString& model) const;
     QHash<QString, QString> _parseBatchOutput(const QByteArray& jsonlOut) const; // id -> raw
+    
+    void _onInternalCallSuccess();
+    void _onInternalCallError(const QString& err);
 
     QNetworkAccessManager m_networkAccessManager;
     int m_maxQueriesSameTime;

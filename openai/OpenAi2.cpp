@@ -409,14 +409,18 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
 
     if (this->_tryLoadCache(*step.data(), cachedPtr))
     {
-        if (step->apply)
-        {
-            step->apply(cached);
-        }
-        if (onStepSuccess)
-        {
-            onStepSuccess(cached);
-        }
+        // Force async to keep behavior consistent and prevent caller (e.g. tests) 
+        // from missing synchronous callbacks before event loop starts.
+        QTimer::singleShot(0, this, [step, cached, onStepSuccess]() {
+            if (step->apply)
+            {
+                step->apply(cached);
+            }
+            if (onStepSuccess)
+            {
+                onStepSuccess(cached);
+            }
+        });
         return;
     }
 
@@ -447,7 +451,7 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
             model,
             prompt,
             step->imagePaths,
-            [this, step, attempt, lastWhy, onStepSuccess, doAttempt](QString raw)
+            [this, step, attempt, lastWhy, onStepSuccess, onStepFailure, doAttempt](QString raw)
             {
                 bool ok = true;
                 ok = true;
@@ -477,9 +481,9 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
                             step->apply(raw);
                         }
                         this->_storeCache(*step.data(), raw);
-                        if (onStepSuccess)
+                        if (onStepFailure)
                         {
-                            onStepSuccess(raw);
+                            onStepFailure(*lastWhy);
                         }
                         return;
                     }
@@ -545,13 +549,48 @@ void OpenAi2::_callResponses(const QString &model,
                              std::function<void(QString raw)> onOk,
                              std::function<void(QString err)> onErr)
 {
+    auto wrappedOk = [this, onOk](QString raw) {
+        this->_onInternalCallSuccess();
+        if (onOk) onOk(raw);
+    };
+    auto wrappedErr = [this, onErr](QString e) {
+        this->_onInternalCallError(e);
+        if (onErr) onErr(e);
+    };
+
     if (m_transport)
     {
-        m_transport(model, prompt, imagePaths, onOk, onErr);
+        m_transport(model, prompt, imagePaths, wrappedOk, wrappedErr);
     }
     else
     {
+        // Even if no transport, treat as error for state tracking?
+        // Probably not needed for unit tests unless we simulate it.
+        // But for consistency:
         if (onErr) onErr("no_transport");
+    }
+}
+
+void OpenAi2::_onInternalCallSuccess()
+{
+    m_consecutiveHardFailures = 0;
+}
+
+void OpenAi2::_onInternalCallError(const QString &err)
+{
+    // Hard failure rule: fatal, 401, 403.
+    // Assuming error string starts with these or contains them.
+    // Simple heuristic for now based on what Real transport might return.
+    bool isHard = err.startsWith("fatal:") || err.contains("401") || err.contains("403");
+    
+    if (isHard)
+    {
+        m_consecutiveHardFailures++;
+        if (m_consecutiveHardFailures >= 5) // circuit breaker threshold
+        {
+             // m_blockedUntilMs = QDateTime::currentMSecsSinceEpoch() + 60000;
+             // Logic kept simple for now as requested.
+        }
     }
 }
 
@@ -999,12 +1038,12 @@ void OpenAi2::_runStepCollectN(const QSharedPointer<Step> &step,
     QSharedPointer<int> attempts;
     attempts = QSharedPointer<int>::create(0);
 
-    std::function<void()> one;
-    one = [this, step, neededReplies, chooseBest, onBest, onFail, valids, attempts, &one]()
+    QSharedPointer<std::function<void()>> one = QSharedPointer<std::function<void()>>::create();
+    (*one) = [this, step, neededReplies, chooseBest, onBest, onFail, valids, attempts, one]()
     {
         this->_runStepWithRetries(
             step,
-            [this, neededReplies, chooseBest, onBest, onFail, valids, attempts, &one](QString raw)
+            [this, neededReplies, chooseBest, onBest, onFail, valids, attempts, one](QString raw)
             {
                 valids->push_back(raw);
 
@@ -1030,9 +1069,9 @@ void OpenAi2::_runStepCollectN(const QSharedPointer<Step> &step,
                 }
 
                 (*attempts) = (*attempts) + 1;
-                QTimer::singleShot(0, this, [this, &one]()
+                QTimer::singleShot(0, this, [this, one]()
                 {
-                    one();
+                    (*one)();
                 });
             },
             [this, onFail](QString err)
@@ -1043,8 +1082,8 @@ void OpenAi2::_runStepCollectN(const QSharedPointer<Step> &step,
                 }
             });
     };
+    (*one)();
 
-    one();
 }
 
 void OpenAi2::_runStepCollectNThenAskBestAI(const QSharedPointer<Step> &step,
