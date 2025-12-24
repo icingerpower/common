@@ -9,8 +9,6 @@
 #include <QUrl>
 #include <QUuid>
 
-#include "ExceptionOpenAiNotInitialized.h"
-
 #include "OpenAi.h"
 
 
@@ -58,7 +56,8 @@ void OpenAi::init(const QString &openAiKey) {
 void OpenAi::_raiseExceptionIfNotInitialized() {
     if (!m_initialized)
     {
-        ExceptionOpenAiNotInitialized ex; ex.raise();
+        ExceptionOpenAiNotInitialized ex;
+        ex.raise();
     }
 }
 
