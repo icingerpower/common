@@ -6,6 +6,8 @@
 #include <QNetworkAccessManager>
 #include <QSharedPointer>
 #include <QQueue>
+#include <functional>
+
 
 class OpenAi2 : public QObject
 {
@@ -14,6 +16,18 @@ class OpenAi2 : public QObject
 public:
     static const QString KEY_OPEN_AI_API_KEY;
     static const QUrl RESPONSES_URL;
+    
+    struct DebugState {
+        bool initialized;
+        int maxQueriesSameTime;
+        int inFlightText;
+        int inFlightImage;
+        bool pumping;
+        qint64 blockedUntilMs;
+        int consecutiveHardFailures;
+        int pendingTextSize;
+        int pendingImageSize;
+    };
 
     static OpenAi2* instance();
     struct Step{
@@ -34,6 +48,11 @@ public:
             , int maxQueriesSameTime = 5
             , int maxQueriesImageSameTime = 1
             , int timeoutMsBetweenImageQueries = 30000);
+
+    // Test Hooks
+    void setTransportForTests(std::function<void(const QString&, const QString&, const QList<QString>&, std::function<void(QString)>, std::function<void(QString)>)> transport);
+    void resetForTests();
+    DebugState getDebugStateForTests() const;
 
     struct StepMultipleAsk : Step{ // Prompt is asked several time and a function will ask the best reply
         int neededReplies = 3; // For instance 3 valid replies are needed before a best reply will be choosen

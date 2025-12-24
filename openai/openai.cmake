@@ -5,5 +5,7 @@ set(OPENAI_FILES
     ${CMAKE_CURRENT_LIST_DIR}/ExceptionOpenAiNotInitialized.cpp
     ${CMAKE_CURRENT_LIST_DIR}/OpenAi.h
     ${CMAKE_CURRENT_LIST_DIR}/OpenAi.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/OpenAi2.h
+    ${CMAKE_CURRENT_LIST_DIR}/OpenAi2.cpp
 )
 

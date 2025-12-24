@@ -58,6 +58,43 @@ void OpenAi2::init(const QString &apiKey
     m_timeoutMsBetweenImageQueries = timeoutMsBetweenImageQueries;
 }
 
+void OpenAi2::setTransportForTests(std::function<void(const QString&, const QString&, const QList<QString>&, std::function<void(QString)>, std::function<void(QString)>)> transport)
+{
+    m_transport = transport;
+}
+
+void OpenAi2::resetForTests()
+{
+    m_initialized = false;
+    m_openAiKey = "";
+    m_pendingText.clear();
+    m_pendingImage.clear();
+    m_inFlightText = 0;
+    m_inFlightImage = 0;
+    m_pumping = false;
+    m_blockedUntilMs = 0;
+    m_consecutiveHardFailures = 0;
+    
+    m_transport = [this](const QString &m, const QString &p, const QList<QString> &i, std::function<void(QString)> ok, std::function<void(QString)> err) {
+         this->_callResponses_Real(m, p, i, ok, err);
+    };
+}
+
+OpenAi2::DebugState OpenAi2::getDebugStateForTests() const
+{
+    DebugState s;
+    s.initialized = m_initialized;
+    s.maxQueriesSameTime = m_maxQueriesSameTime;
+    s.inFlightText = m_inFlightText;
+    s.inFlightImage = m_inFlightImage;
+    s.pumping = m_pumping;
+    s.blockedUntilMs = m_blockedUntilMs;
+    s.consecutiveHardFailures = m_consecutiveHardFailures;
+    s.pendingTextSize = m_pendingText.size();
+    s.pendingImageSize = m_pendingImage.size();
+    return s;
+}
+
 QString OpenAi2::Step::getGptModel(int attempt) const
 {
     if (this->maxRetries <= 0)
@@ -476,6 +513,12 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
                 {
                     maxRetries = 1;
                 }
+                
+                // FATAL: stop immediately
+                if (err.startsWith("fatal:"))
+                {
+                     (*attempt) = maxRetries + 1; // Force stop
+                }
 
                 if ((*attempt) >= maxRetries)
                 {
@@ -650,8 +693,9 @@ void OpenAi2::_callResponses_Real(const QString &model,
                           .arg(httpStatus)
                           .arg(QString::fromUtf8(body.left(512)));
 
-                // Optional: circuit-breaker escalation (requires members)
-                // m_consecutiveHardFailures++;
+                // Network error is a "hard" failure (can be retryable usually, but if consecutive fails stack up...)
+                // For now, logic: keep counting.
+                m_consecutiveHardFailures++;
 
                 if (onErr)
                 {
@@ -663,19 +707,29 @@ void OpenAi2::_callResponses_Real(const QString &model,
             if (httpStatus >= 400)
             {
                 QString err;
-                err = QString("http_error:%1:%2")
+                // Client errors (400, 401, 403) are typically fatal (logic error, auth error)
+                // 429 (Too Many Requests) is retryable (throttling)
+                // 5xx (Server Error) is retryable
+                
+                bool isFatal = (httpStatus == 400 || httpStatus == 401 || httpStatus == 403);
+                
+                if (isFatal) {
+                     err = QString("fatal:http_error:%1:%2")
                           .arg(httpStatus)
                           .arg(QString::fromUtf8(body.left(1024)));
+                } else {
+                     err = QString("http_error:%1:%2")
+                          .arg(httpStatus)
+                          .arg(QString::fromUtf8(body.left(1024)));
+                }
 
-                // Suggested: detect 401/403/429 and open circuit breaker
-                // if ((httpStatus == 401) || (httpStatus == 403))
-                // {
-                //     m_blockedUntilMs = QDateTime::currentMSecsSinceEpoch() + 30 * 60 * 1000;
-                // }
-                // if (httpStatus == 429)
-                // {
-                //     m_blockedUntilMs = QDateTime::currentMSecsSinceEpoch() + 2 * 60 * 1000;
-                // }
+                if (httpStatus == 429)
+                {
+                     m_blockedUntilMs = QDateTime::currentMSecsSinceEpoch() + 2 * 60 * 1000;
+                }
+
+                // If fatal, we might consider it a harder fail?
+                m_consecutiveHardFailures++;
 
                 if (onErr)
                 {
@@ -683,6 +737,9 @@ void OpenAi2::_callResponses_Real(const QString &model,
                 }
                 return;
             }
+
+            // Success
+            m_consecutiveHardFailures = 0;
 
             // Return RAW JSON string (caller validate/apply decides what to do)
             QString raw;
