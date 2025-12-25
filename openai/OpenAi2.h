@@ -29,6 +29,10 @@ public:
         int pendingImageSize;
     };
 
+    static std::function<QString(const QList<QString> &gptReplies)> CHOOSE_MOST_FREQUENT;
+    static std::function<QString(const QList<QString> &gptReplies)> CHOOSE_ALL_SAME_OR_EMPTY;
+
+
     static OpenAi2* instance();
     struct Step{
         QString id;
@@ -56,7 +60,7 @@ public:
 
     struct StepMultipleAsk : Step{ // Prompt is asked several time and a function will ask the best reply
         int neededReplies = 3; // For instance 3 valid replies are needed before a best reply will be choosen
-        std::function<void(std::function<QString(const QList<QString> &gptReplies)>)> getBestReply;
+        std::function<QString(const QList<QString> &gptReplies)> chooseBest;
     };
 
     struct StepMultipleAskAi : Step{ // Prompt is asked several time and the AI will select the best reply

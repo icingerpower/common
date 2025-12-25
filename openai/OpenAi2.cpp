@@ -20,6 +20,39 @@
 
 #include "OpenAi2.h"
 
+std::function<QString(const QList<QString> &gptReplies)> CHOOSE_MOST_FREQUENT
+= [](const QList<QString> &gptReplies) -> QString {
+    QHash<QString, int> reply_count;
+    for (const auto &gptReply : gptReplies)
+    {
+        reply_count[gptReply] = reply_count[gptReply] + 1;
+    }
+    QMap<int, QString> count_replies;
+    for (auto it = reply_count.constBegin();
+         it != reply_count.constEnd(); ++it)
+    {
+        count_replies[it.value()] = it.key();
+    }
+    return count_replies.last();
+};
+
+std::function<QString(const QList<QString> &gptReplies)> CHOOSE_ALL_SAME_OR_EMPTY
+= [](const QList<QString> &gptReplies) -> QString {
+    if (gptReplies.size() == 0)
+    {
+        return QString{};
+    }
+    QSet<QString> replies;
+    for (const auto &gptReply : gptReplies)
+    {
+        replies.insert(gptReply);
+        if (replies.size() > 1)
+        {
+            return QString{};
+        }
+    }
+    return gptReplies[0];
+};
 
 const QString OpenAi2::KEY_OPEN_AI_API_KEY = "open-ai-api-key";
 const QUrl OpenAi2::RESPONSES_URL("https://api.openai.com/v1/responses");
@@ -74,6 +107,7 @@ void OpenAi2::resetForTests()
     m_pumping = false;
     m_blockedUntilMs = 0;
     m_consecutiveHardFailures = 0;
+    m_transport = nullptr;
     
     m_transport = [this](const QString &m, const QString &p, const QList<QString> &i, std::function<void(QString)> ok, std::function<void(QString)> err) {
          this->_callResponses_Real(m, p, i, ok, err);
@@ -135,38 +169,58 @@ void OpenAi2::askGpt(const QList<QSharedPointer<Step>> &stepsInQueue, const QStr
     Q_UNUSED(model);
 }
 
-void OpenAi2::askGptMultipleTime(const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue, const QString &model)
+void OpenAi2::askGptMultipleTime(
+        const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue, const QString &model)
 {
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
         throw ex;
     }
+    
+    Q_UNUSED(model); // model is usually inside step or handled by runStep logic
 
-    QList<QSharedPointer<Step>> steps;
-    steps.reserve(stepsInQueue.size());
-
-    for (int i = 0; i < stepsInQueue.size(); i++)
+    if (stepsInQueue.isEmpty())
     {
-        QSharedPointer<StepMultipleAsk> s;
-        s = stepsInQueue[i];
-
-        QSharedPointer<Step> base;
-        base = qSharedPointerCast<Step>(s);
-
-        steps.push_back(base);
+        return;
     }
 
-    this->_runQueue(
-        steps,
-        []()
-        {
-        },
-        [](QString)
-        {
-        });
+    QSharedPointer<int> idx = QSharedPointer<int>::create(0);
+    // Trampoline for recursion
+    QSharedPointer<std::function<void()>> runNext = QSharedPointer<std::function<void()>>::create();
 
-    Q_UNUSED(model);
+    *runNext = [this, stepsInQueue, idx, runNext]()
+    {
+        if ((*idx) >= stepsInQueue.size())
+        {
+            return;
+        }
+
+        auto step = stepsInQueue[*idx];
+
+
+        this->_runStepCollectN(
+            step,
+            step->neededReplies,
+            step->chooseBest, 
+            [step, idx, runNext](QString best)
+            {
+                if (step->apply)
+                {
+                    step->apply(best);
+                }
+                (*idx) = (*idx) + 1;
+                QTimer::singleShot(0, [runNext](){ (*runNext)(); });
+            },
+            [idx](QString err)
+            {
+                qWarning() << "askGptMultipleTime failed step" << *idx << ":" << err;
+                // Stop execution on failure, consistent with _runQueue
+            }
+        );
+    };
+
+    (*runNext)();
 }
 
 void OpenAi2::askGptMultipleTimeAi(const QList<QSharedPointer<StepMultipleAskAi>> &stepsInQueue, const QString &model)
@@ -392,6 +446,7 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
         throw ex;
     }
 
+
     if (step.isNull())
     {
         if (onStepFailure)
@@ -549,6 +604,7 @@ void OpenAi2::_callResponses(const QString &model,
                              std::function<void(QString raw)> onOk,
                              std::function<void(QString err)> onErr)
 {
+
     auto wrappedOk = [this, onOk](QString raw) {
         this->_onInternalCallSuccess();
         if (onOk) onOk(raw);
