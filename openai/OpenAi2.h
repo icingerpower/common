@@ -7,8 +7,11 @@
 #include <QSharedPointer>
 #include <QQueue>
 #include <functional>
+#include <QFuture>
+#include <QCoro/QCoroTask>
 
 
+class QTimer;
 class OpenAi2 : public QObject
 {
     Q_OBJECT
@@ -17,6 +20,15 @@ public:
     static const QString KEY_OPEN_AI_API_KEY;
     static const QUrl RESPONSES_URL;
     
+    struct TransportError {
+        enum Type { NetworkError, HttpError, Timeout, ParseError, Unknown };
+        Type type = Unknown;
+        int httpStatus = 0;
+        QString message;
+        bool isRetryable = true;
+        bool isFatal = false;
+    };
+
     struct DebugState {
         bool initialized;
         int maxQueriesSameTime;
@@ -53,10 +65,14 @@ public:
             , int maxQueriesImageSameTime = 1
             , int timeoutMsBetweenImageQueries = 30000);
 
+#ifdef OPENAI2_UNIT_TESTS
     // Test Hooks
-    void setTransportForTests(std::function<void(const QString&, const QString&, const QList<QString>&, std::function<void(QString)>, std::function<void(QString)>)> transport);
+    void setTransportForTests(std::function<void(const QString&, const QString&, const QList<QString>&, std::function<void(QString)>, std::function<void(TransportError)>)> transport);
     void resetForTests();
     DebugState getDebugStateForTests() const;
+    void setTimeProviderForTests(std::function<qint64()> provider);
+    void forcePumpForTests() { _pumpLoop(); }
+#endif
 
     struct StepMultipleAsk : Step{ // Prompt is asked several time and a function will ask the best reply
         int neededReplies = 3; // For instance 3 valid replies are needed before a best reply will be choosen
@@ -75,6 +91,10 @@ public:
             , const QString &model
             );
     void askGptMultipleTime(
+            const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue
+            , const QString &model
+            );
+    QCoro::Task<void> askGptMultipleTimeCoro(
             const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue
             , const QString &model
             );
@@ -122,17 +142,19 @@ private:
         const QString& prompt,
         const QList<QString>& imagePaths,
         std::function<void(QString raw)> onOk,
-        std::function<void(QString err)> onErr);
+        std::function<void(TransportError err)> onErr);
 
     // Cache helpers
-    bool _tryLoadCache(const Step& step, QString* rawOut) const;
-    void _storeCache(const Step& step, const QString& raw) const;
+    bool _tryLoadCache(const Step& step, QString* cached) const;
+    void _storeCache(const Step& step, const QString& content) const;
 
     // Model selection
     QString _selectModelForAttempt(const Step& step, int attempt) const;
 
     // Optional: throttle/scheduler hooks (based on m_maxQueriesSameTime / images)
-    void _schedule(std::function<void(std::function<void()>)> startRequest);
+    void _requestPump(int delayMs = 0);
+    void _pumpLoop();
+    void _schedule(std::function<void(std::function<void()>)> job, bool isImage);
     void _runStepCollectN(
         const QSharedPointer<Step>& step,
         int neededReplies,
@@ -156,33 +178,48 @@ private:
         std::function<void()> onAllSuccess,
         std::function<void(QString)> onAllFailure);
 
+    void _runMultipleTime(
+         const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue
+         , const QString &model
+         , std::function<void()> onAllSuccess
+         , std::function<void(QString)> onAllFailure);
+
     QByteArray _buildBatchJsonl(const QList<QSharedPointer<Step>>& steps, const QString& model) const;
-    QHash<QString, QString> _parseBatchOutput(const QByteArray& jsonlOut) const; // id -> raw
+    QHash<QString, QString> _parseBatchOutput(const QByteArray& jsonlOut) const;
     
     void _onInternalCallSuccess();
-    void _onInternalCallError(const QString& err);
+    void _onInternalCallError(const TransportError& err);
 
     QNetworkAccessManager m_networkAccessManager;
     int m_maxQueriesSameTime;
     int m_maxQueriesImageSameTime;
     int m_timeoutMsBetweenImageQueries; // To avoid being blocked as queries with image easily reach quota
     bool m_initialized;
-    std::function<void(const QString& model, const QString& prompt, const QList<QString>& imagePaths, std::function<void(QString raw)> onOk, std::function<void(QString err)> onErr)> m_transport;
+    
+#ifdef OPENAI2_UNIT_TESTS
+    std::function<void(const QString& model, const QString& prompt, const QList<QString>& imagePaths, std::function<void(QString raw)> onOk, std::function<void(TransportError err)> onErr)> m_transport;
+    std::function<qint64()> m_timeProvider;
+#endif
+
     void _callResponses_Real(
         const QString& model,
         const QString& prompt,
         const QList<QString>& imagePaths,
         std::function<void(QString raw)> onOk,
-        std::function<void(QString err)> onErr);
+        std::function<void(TransportError err)> onErr);
 
     QString m_openAiKey;
     QQueue<std::function<void(std::function<void()>)>> m_pendingText;
-    QQueue<std::function<void()>> m_pendingImage;
+    QQueue<std::function<void(std::function<void()>)>> m_pendingImage;
+    qint64 m_lastImageQueryStartTimeMs;
+    QTimer *m_pumpTimer;
     int m_inFlightText;
     int m_inFlightImage;
     bool m_pumping;
     qint64 m_blockedUntilMs;
     int m_consecutiveHardFailures;
+
+    qint64 _now() const;
 
 };
 

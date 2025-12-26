@@ -13,30 +13,39 @@
 #include <QSet>
 #include <QTextStream>
 #include <QTimer>
+#include <QDateTime>
 #include <QDir>
 
 //#include "ExceptionOpenAiError.h"
 #include "ExceptionOpenAiNotInitialized.h"
 
 #include "OpenAi2.h"
+#include <QCoro/QCoroFuture>
 
-std::function<QString(const QList<QString> &gptReplies)> CHOOSE_MOST_FREQUENT
+std::function<QString(const QList<QString> &gptReplies)> OpenAi2::CHOOSE_MOST_FREQUENT
 = [](const QList<QString> &gptReplies) -> QString {
-    QHash<QString, int> reply_count;
-    for (const auto &gptReply : gptReplies)
+    if (gptReplies.isEmpty()) return QString{};
+
+    QMap<QString, int> counts;
+    for (const auto &r : gptReplies)
     {
-        reply_count[gptReply] = reply_count[gptReply] + 1;
+        counts[r]++;
     }
-    QMap<int, QString> count_replies;
-    for (auto it = reply_count.constBegin();
-         it != reply_count.constEnd(); ++it)
+    
+    QString best;
+    int maxCount = -1;
+    for (auto it = counts.constBegin(); it != counts.constEnd(); ++it)
     {
-        count_replies[it.value()] = it.key();
+        if (it.value() > maxCount)
+        {
+             maxCount = it.value();
+             best = it.key();
+        }
     }
-    return count_replies.last();
+    return best;
 };
 
-std::function<QString(const QList<QString> &gptReplies)> CHOOSE_ALL_SAME_OR_EMPTY
+std::function<QString(const QList<QString> &gptReplies)> OpenAi2::CHOOSE_ALL_SAME_OR_EMPTY
 = [](const QList<QString> &gptReplies) -> QString {
     if (gptReplies.size() == 0)
     {
@@ -73,11 +82,19 @@ OpenAi2::OpenAi2(QObject *parent)
     m_pumping = false;
     m_blockedUntilMs = 0;
     m_consecutiveHardFailures = 0;
+    m_lastImageQueryStartTimeMs = 0;
+    m_pumpTimer = nullptr;
 
-    m_transport = [this](const QString &model, const QString &prompt, const QList<QString> &imagePaths, std::function<void(QString)> onOk, std::function<void(QString)> onErr)
+#ifdef OPENAI2_UNIT_TESTS
+    m_transport = [this](const QString &model, const QString &prompt, const QList<QString> &imagePaths, std::function<void(QString)> onOk, std::function<void(TransportError)> onErr)
     {
         this->_callResponses_Real(model, prompt, imagePaths, onOk, onErr);
     };
+#endif
+
+    m_pumpTimer = new QTimer(this);
+    m_pumpTimer->setSingleShot(true);
+    connect(m_pumpTimer, &QTimer::timeout, this, &OpenAi2::_pumpLoop);
 }
 
 void OpenAi2::init(const QString &apiKey
@@ -91,7 +108,8 @@ void OpenAi2::init(const QString &apiKey
     m_timeoutMsBetweenImageQueries = timeoutMsBetweenImageQueries;
 }
 
-void OpenAi2::setTransportForTests(std::function<void(const QString&, const QString&, const QList<QString>&, std::function<void(QString)>, std::function<void(QString)>)> transport)
+#ifdef OPENAI2_UNIT_TESTS
+void OpenAi2::setTransportForTests(std::function<void(const QString&, const QString&, const QList<QString>&, std::function<void(QString)>, std::function<void(TransportError)>)> transport)
 {
     m_transport = transport;
 }
@@ -108,10 +126,27 @@ void OpenAi2::resetForTests()
     m_blockedUntilMs = 0;
     m_consecutiveHardFailures = 0;
     m_transport = nullptr;
+    m_lastImageQueryStartTimeMs = 0;
+    if (m_pumpTimer) m_pumpTimer->stop();
+    m_timeProvider = nullptr; // Reset time provider
     
-    m_transport = [this](const QString &m, const QString &p, const QList<QString> &i, std::function<void(QString)> ok, std::function<void(QString)> err) {
+    m_transport = [this](const QString &m, const QString &p, const QList<QString> &i, std::function<void(QString)> ok, std::function<void(TransportError)> err) {
          this->_callResponses_Real(m, p, i, ok, err);
     };
+}
+
+void OpenAi2::setTimeProviderForTests(std::function<qint64()> provider)
+{
+    m_timeProvider = provider;
+}
+
+
+qint64 OpenAi2::_now() const
+{
+#ifdef OPENAI2_UNIT_TESTS
+    if (m_timeProvider) return m_timeProvider();
+#endif
+    return QDateTime::currentMSecsSinceEpoch();
 }
 
 OpenAi2::DebugState OpenAi2::getDebugStateForTests() const
@@ -128,6 +163,7 @@ OpenAi2::DebugState OpenAi2::getDebugStateForTests() const
     s.pendingImageSize = m_pendingImage.size();
     return s;
 }
+#endif
 
 QString OpenAi2::Step::getGptModel(int attempt) const
 {
@@ -172,6 +208,39 @@ void OpenAi2::askGpt(const QList<QSharedPointer<Step>> &stepsInQueue, const QStr
 void OpenAi2::askGptMultipleTime(
         const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue, const QString &model)
 {
+    this->_runMultipleTime(stepsInQueue, model, nullptr, nullptr);
+}
+
+QCoro::Task<void> OpenAi2::askGptMultipleTimeCoro(
+        const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue, const QString &model)
+{
+    // Use QSharedPointer to share the promise state safely across lambdas
+    auto promise = QSharedPointer<QFutureInterface<void>>::create();
+    promise->reportStarted();
+    QFuture<void> future = promise->future();
+
+    this->_runMultipleTime(
+        stepsInQueue, 
+        model, 
+        [promise]() {
+            promise->reportFinished();
+        },
+        [promise](QString err) {
+             qWarning() << "askGptMultipleTimeCoro failed:" << err;
+             // Always finish the future to unblock the awaiter.
+             promise->reportFinished();
+        }
+    );
+
+    co_await future;
+}
+
+void OpenAi2::_runMultipleTime(
+         const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue
+         , const QString &model
+         , std::function<void()> onAllSuccess
+         , std::function<void(QString)> onAllFailure)
+{
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
@@ -182,17 +251,20 @@ void OpenAi2::askGptMultipleTime(
 
     if (stepsInQueue.isEmpty())
     {
+        if (onAllSuccess) onAllSuccess();
         return;
     }
 
     QSharedPointer<int> idx = QSharedPointer<int>::create(0);
     // Trampoline for recursion
     QSharedPointer<std::function<void()>> runNext = QSharedPointer<std::function<void()>>::create();
-
-    *runNext = [this, stepsInQueue, idx, runNext]()
+    
+    // Capture callbacks by copy
+    *runNext = [this, stepsInQueue, idx, runNext, onAllSuccess, onAllFailure]()
     {
         if ((*idx) >= stepsInQueue.size())
         {
+            if (onAllSuccess) onAllSuccess();
             return;
         }
 
@@ -212,10 +284,11 @@ void OpenAi2::askGptMultipleTime(
                 (*idx) = (*idx) + 1;
                 QTimer::singleShot(0, [runNext](){ (*runNext)(); });
             },
-            [idx](QString err)
+            [idx, onAllFailure](QString err)
             {
                 qWarning() << "askGptMultipleTime failed step" << *idx << ":" << err;
                 // Stop execution on failure, consistent with _runQueue
+                if (onAllFailure) onAllFailure(err);
             }
         );
     };
@@ -531,11 +604,8 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
 
                     if ((*attempt) >= maxRetries)
                     {
-                        if (step->apply)
-                        {
-                            step->apply(raw);
-                        }
-                        this->_storeCache(*step.data(), raw);
+                        // FAIL: retries exhausted. 
+                        // CRITICAL FIX: Do NOT apply() or cache() invalid/failed result.
                         if (onStepFailure)
                         {
                             onStepFailure(*lastWhy);
@@ -560,9 +630,9 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
                     onStepSuccess(raw);
                 }
             },
-            [this, step, attempt, lastWhy, onStepFailure, doAttempt](QString err)
+            [this, step, attempt, lastWhy, onStepFailure, doAttempt](TransportError err)
             {
-                (*lastWhy) = err;
+                (*lastWhy) = err.message;
                 (*attempt) = (*attempt) + 1;
 
                 int maxRetries = 0;
@@ -574,7 +644,7 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
                 }
                 
                 // FATAL: stop immediately
-                if (err.startsWith("fatal:"))
+                if (err.isFatal)
                 {
                      (*attempt) = maxRetries + 1; // Force stop
                 }
@@ -583,7 +653,7 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
                 {
                     if (onStepFailure)
                     {
-                        onStepFailure(err);
+                        onStepFailure(err.message);
                     }
                     return;
                 }
@@ -602,29 +672,58 @@ void OpenAi2::_callResponses(const QString &model,
                              const QString &prompt,
                              const QList<QString> &imagePaths,
                              std::function<void(QString raw)> onOk,
-                             std::function<void(QString err)> onErr)
+                             std::function<void(TransportError err)> onErr)
 {
+    bool isImage = !imagePaths.isEmpty();
 
+    // Wrap validation/state tracking logic
     auto wrappedOk = [this, onOk](QString raw) {
         this->_onInternalCallSuccess();
         if (onOk) onOk(raw);
     };
-    auto wrappedErr = [this, onErr](QString e) {
+    auto wrappedErr = [this, onErr](TransportError e) {
         this->_onInternalCallError(e);
         if (onErr) onErr(e);
     };
 
-    if (m_transport)
-    {
-        m_transport(model, prompt, imagePaths, wrappedOk, wrappedErr);
-    }
-    else
-    {
-        // Even if no transport, treat as error for state tracking?
-        // Probably not needed for unit tests unless we simulate it.
-        // But for consistency:
-        if (onErr) onErr("no_transport");
-    }
+    // SCHEDULE HERE
+    // This ensures both Real and Fake transports (used in tests) respect the scheduler/throttling.
+    _schedule([this, model, prompt, imagePaths, wrappedOk, wrappedErr](std::function<void()> done) {
+        
+        // Wrap callbacks to trigger 'done' when finished
+        auto doneOk = [wrappedOk, done](QString raw) {
+            wrappedOk(raw);
+            done(); 
+        };
+        auto doneErr = [wrappedErr, done](TransportError e) {
+            wrappedErr(e);
+            done();
+        };
+
+        try {
+#ifdef OPENAI2_UNIT_TESTS
+            if (m_transport)
+            {
+                m_transport(model, prompt, imagePaths, doneOk, doneErr);
+                return;
+            }
+#endif
+            this->_callResponses_Real(model, prompt, imagePaths, doneOk, doneErr);
+
+        } catch (const std::exception &e) {
+            TransportError err{}; 
+            err.type = TransportError::Unknown; 
+            err.message = QString("transport_exception:%1").arg(e.what());
+            err.isFatal = false;
+            doneErr(err);
+        } catch (...) {
+            TransportError err{}; 
+            err.type = TransportError::Unknown; 
+            err.message = "transport_exception:unknown";
+            err.isFatal = false;
+            doneErr(err);
+        }
+    }, isImage);
 }
 
 void OpenAi2::_onInternalCallSuccess()
@@ -632,29 +731,24 @@ void OpenAi2::_onInternalCallSuccess()
     m_consecutiveHardFailures = 0;
 }
 
-void OpenAi2::_onInternalCallError(const QString &err)
+void OpenAi2::_onInternalCallError(const TransportError &err)
 {
-    // Hard failure rule: fatal, 401, 403.
-    // Assuming error string starts with these or contains them.
-    // Simple heuristic for now based on what Real transport might return.
-    bool isHard = err.startsWith("fatal:") || err.contains("401") || err.contains("403");
-    
-    if (isHard)
+    if (err.isFatal)
     {
         m_consecutiveHardFailures++;
-        if (m_consecutiveHardFailures >= 5) // circuit breaker threshold
+        if (m_consecutiveHardFailures >= 5) 
         {
-             // m_blockedUntilMs = QDateTime::currentMSecsSinceEpoch() + 60000;
-             // Logic kept simple for now as requested.
+             // Circuit breaker logic placeholder
         }
     }
 }
+
 
 void OpenAi2::_callResponses_Real(const QString &model,
                              const QString &prompt,
                              const QList<QString> &imagePaths,
                              std::function<void(QString raw)> onOk,
-                             std::function<void(QString err)> onErr)
+                             std::function<void(TransportError err)> onErr)
 {
     if (!m_initialized)
     {
@@ -668,16 +762,7 @@ void OpenAi2::_callResponses_Real(const QString &model,
         throw ex;
     }
 
-    // Optional circuit-breaker (requires members):
-    // qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-    // if (m_blockedUntilMs > nowMs)
-    // {
-    //     if (onErr)
-    //     {
-    //         onErr("circuit_breaker_blocked");
-    //     }
-    //     return;
-    // }
+
 
     QJsonObject root;
     root.insert("model", model);
@@ -703,7 +788,11 @@ void OpenAi2::_callResponses_Real(const QString &model,
         {
             if (onErr)
             {
-                onErr(QString("cannot_open_image:%1").arg(path));
+                TransportError e{};
+                e.type = TransportError::Unknown;
+                e.message = QString("cannot_open_image:%1").arg(path);
+                e.isRetryable = false;
+                onErr(e);
             }
             return;
         }
@@ -748,145 +837,137 @@ void OpenAi2::_callResponses_Real(const QString &model,
     QString auth;
     auth = "Bearer " + m_openAiKey;
     req.setRawHeader("Authorization", auth.toUtf8());
-    req.setRawHeader("Authorization", auth.toUtf8());
     req.setRawHeader("Accept", "application/json");
     req.setRawHeader("User-Agent", "OpenAi2-QtTest/1.0");
 
-    // IMPORTANT: throttle/schedule through _schedule
-    bool isImage = false;
-    isImage = !imagePaths.isEmpty();
+    // Execute immediately (scheduler is handled by caller _callResponses)
+    QNetworkReply *reply = nullptr;
+    reply = m_networkAccessManager.post(req, payload);
 
-    std::function<void(std::function<void()>)> startRequest;
-    startRequest = [this, req, payload, onOk, onErr](std::function<void()> done)
+    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, onOk, onErr]()
     {
-        QNetworkReply *reply = nullptr;
-        reply = m_networkAccessManager.post(req, payload);
-
-        QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, onOk, onErr, done]()
-        {
-            QByteArray body;
-            body = reply->readAll();
-
-            int httpStatus = 0;
-            httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-
-            QNetworkReply::NetworkError netErr = reply->error();
-            const QVariant wwwAuth = reply->rawHeader("www-authenticate");
-            qWarning() << "HTTP status:" << httpStatus
-                       << "netErr:" << netErr
-                       << "url:" << reply->url()
-                       << "www-authenticate:" << wwwAuth.toString();
-            qWarning() << "Body (first 1024):" << QString::fromUtf8(body.left(1024));
-
+        // Helper to cleanup reply. 
+        // Note: done() is handled by the wrapper passed as onOk/onErr.
+        auto finish = [reply]() {
             reply->deleteLater();
+        };
 
-            if (netErr != QNetworkReply::NoError)
+        QByteArray body;
+        body = reply->readAll();
+
+        int httpStatus = 0;
+        httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+        QNetworkReply::NetworkError netErr = reply->error();
+        const QVariant wwwAuth = reply->rawHeader("www-authenticate");
+        qWarning() << "Body (first 1024):" << QString::fromUtf8(body.left(1024));
+
+        if (netErr != QNetworkReply::NoError)
+        {
+            TransportError err{};
+            err.type = TransportError::NetworkError;
+            err.httpStatus = httpStatus;
+            err.message = QString("network_error:%1:http:%2:%3")
+                      .arg(static_cast<int>(netErr))
+                      .arg(httpStatus)
+                      .arg(QString::fromUtf8(body.left(512)));
+            err.isRetryable = true;
+            err.isFatal = false;
+
+            if (onErr)
             {
-                QString err;
-                err = QString("network_error:%1:http:%2:%3")
-                          .arg(static_cast<int>(netErr))
-                          .arg(httpStatus)
-                          .arg(QString::fromUtf8(body.left(512)));
+                onErr(err);
+            }
+            finish();
+            return;
+        }
 
-                // Network error is a "hard" failure (can be retryable usually, but if consecutive fails stack up...)
-                // For now, logic: keep counting.
-                m_consecutiveHardFailures++;
+        if (httpStatus >= 400)
+        {
+            TransportError err{};
+            err.type = TransportError::HttpError;
+            err.httpStatus = httpStatus;
+            
+            bool isFatal = (httpStatus == 400 || httpStatus == 401 || httpStatus == 403);
+            err.isFatal = isFatal;
+            err.isRetryable = !isFatal;
 
-                if (onErr)
-                {
-                    onErr(err);
-                }
-                return;
+            if (isFatal) {
+                 err.message = QString("fatal:http_error:%1:%2")
+                      .arg(httpStatus)
+                      .arg(QString::fromUtf8(body.left(1024)));
+            } else {
+                 err.message = QString("http_error:%1:%2")
+                      .arg(httpStatus)
+                      .arg(QString::fromUtf8(body.left(1024)));
             }
 
-            if (httpStatus >= 400)
+            if (httpStatus == 429)
             {
-                QString err;
-                // Client errors (400, 401, 403) are typically fatal (logic error, auth error)
-                // 429 (Too Many Requests) is retryable (throttling)
-                // 5xx (Server Error) is retryable
-                
-                bool isFatal = (httpStatus == 400 || httpStatus == 401 || httpStatus == 403);
-                
-                if (isFatal) {
-                     err = QString("fatal:http_error:%1:%2")
-                          .arg(httpStatus)
-                          .arg(QString::fromUtf8(body.left(1024)));
-                } else {
-                     err = QString("http_error:%1:%2")
-                          .arg(httpStatus)
-                          .arg(QString::fromUtf8(body.left(1024)));
-                }
-
-                if (httpStatus == 429)
-                {
-                     m_blockedUntilMs = QDateTime::currentMSecsSinceEpoch() + 2 * 60 * 1000;
-                }
-
-                // If fatal, we might consider it a harder fail?
-                m_consecutiveHardFailures++;
-
-                if (onErr)
-                {
-                    onErr(err);
-                }
-                return;
+                 m_blockedUntilMs = _now() + 2 * 60 * 1000;
             }
 
-            // Success
-            m_consecutiveHardFailures = 0;
-
-            // Return RAW JSON string (caller validate/apply decides what to do)
-            QString raw;
-            QString text;
-
-            QJsonParseError pe;
-            QJsonDocument doc = QJsonDocument::fromJson(body, &pe);
-            if (pe.error == QJsonParseError::NoError && doc.isObject())
+            if (onErr)
             {
-                QJsonObject root = doc.object();
-                QJsonArray output = root.value("output").toArray();
-                for (const QJsonValue& v : output)
-                {
-                    QJsonObject o = v.toObject();
-                    if (o.value("type").toString() != "message")
-                        continue;
+                onErr(err);
+            }
+            finish();
+            return;
+        }
 
-                    QJsonArray content = o.value("content").toArray();
-                    for (const QJsonValue& cv : content)
+        // Success
+        // m_consecutiveHardFailures = 0;
+
+        QString raw;
+        QString text;
+
+        QJsonParseError pe;
+        QJsonDocument doc = QJsonDocument::fromJson(body, &pe);
+        if (pe.error == QJsonParseError::NoError && doc.isObject())
+        {
+            QJsonObject root = doc.object();
+            QJsonArray output = root.value("output").toArray();
+            for (const QJsonValue& v : output)
+            {
+                QJsonObject o = v.toObject();
+                if (o.value("type").toString() != "message")
+                    continue;
+
+                QJsonArray content = o.value("content").toArray();
+                for (const QJsonValue& cv : content)
+                {
+                    QJsonObject c = cv.toObject();
+                    if (c.value("type").toString() == "output_text")
                     {
-                        QJsonObject c = cv.toObject();
-                        if (c.value("type").toString() == "output_text")
-                        {
-                            text = c.value("text").toString();
-                            break;
-                        }
+                        text = c.value("text").toString();
+                        break;
                     }
-                    if (!text.isEmpty()) break;
                 }
+                if (!text.isEmpty()) break;
             }
+        }
 
-            if (text.isEmpty())
-            {
-                if (onErr) onErr("parse_error:no_output_text");
-                if (done) done();
-                return;
+        if (text.isEmpty())
+        {
+            if (onErr) {
+                TransportError te{};
+                te.type = TransportError::ParseError;
+                te.message = "parse_error:no_output_text";
+                te.isRetryable = true; 
+                te.isFatal = false;
+                onErr(te);
             }
+            finish();
+            return;
+        }
 
-            if (onOk)
-            {
-                onOk(text);
-            }
-            if (done) done();
+        if (onOk)
+        {
+            onOk(text);
+        }
+        finish();
 
-
-        });
-    };
-
-    // Route to scheduler
-    this->_schedule(startRequest);
-
-    Q_UNUSED(isImage);
+    });
 }
 
 bool OpenAi2::_tryLoadCache(const Step &step, QString *rawOut) const
@@ -981,96 +1062,124 @@ QString OpenAi2::_selectModelForAttempt(const Step &step, int attempt) const
     return step.getGptModel(attempt);
 }
 
-void OpenAi2::_schedule(std::function<void(std::function<void()>)> startRequest)
+void OpenAi2::_schedule(std::function<void(std::function<void()>)> startRequest, bool isImage)
 {
-    // REQUIREMENT: no static variables. This scheduler assumes MEMBER state exists.
-    // Add in header:
-    //   QQueue<std::function<void()>> m_pendingText;
-    //   int m_inFlightText;
-    //   bool m_pumping;
-    // Also add image queue/limits if you want separate throttling by type.
-
-    if (!startRequest)
+    if (startRequest)
     {
-        return;
+        if (isImage) m_pendingImage.enqueue(startRequest);
+        else m_pendingText.enqueue(startRequest);
     }
+    _requestPump(0);
+}
 
-    m_pendingText.enqueue(startRequest);
+void OpenAi2::_requestPump(int delayMs)
+{
+    if (delayMs < 0) delayMs = 0;
 
-    if (m_pumping)
+    if (m_pumpTimer->isActive())
     {
-        return;
+        int remaining = m_pumpTimer->remainingTime();
+        if (remaining <= delayMs) return; // Existing timer is sooner/same
     }
+    
+    m_pumpTimer->start(delayMs);
+}
 
+void OpenAi2::_pumpLoop()
+{
+    if (m_pumping) return;
     m_pumping = true;
 
-    QSharedPointer<std::function<void()>> pump = QSharedPointer<std::function<void()>>::create();
-    (*pump) = [this, pump]()
+    qint64 now = _now();
+    
+    // Debug logging for T2
+    // qWarning() << "_pumpLoop start. Now:" << now << "BlockedUntil:" << m_blockedUntilMs << "InFlightTxt:" << m_inFlightText << "InFlightImg:" << m_inFlightImage;
+
+    // 1. Blocked Until Check
+    if (m_blockedUntilMs > now)
     {
-        bool progressed = false;
-        progressed = false;
-
-        while (!m_pendingText.isEmpty())
-        {
-            if (m_inFlightText >= m_maxQueriesSameTime)
-            {
-                break;
-            }
-
-            std::function<void(std::function<void()>)> job;
-            job = m_pendingText.dequeue();
-
-            m_inFlightText = m_inFlightText + 1;
-            progressed = true;
-
-            QTimer::singleShot(0, this, [this, job, pump]()
-            {
-                try
-                {
-                    // Pass a "done" callback that decrements inFlight and re-pumps
-                    job([this, pump](){
-                        m_inFlightText = m_inFlightText - 1;
-                        if (m_inFlightText < 0) m_inFlightText = 0;
-                        
-                        // Trigger pump again to consume next in queue if any
-                         QTimer::singleShot(0, this, [pump](){ (*pump)(); });
-                    });
-                }
-                catch (...)
-                {
-                    m_inFlightText = m_inFlightText - 1; 
-                }
-            });
-
-            // NO immediate decrement here. It happens in the done() callback.
-
-            // Removed the immediate decrement logic block
-        }
-
+        _requestPump(m_blockedUntilMs - now + 100);
         m_pumping = false;
+        return;
+    }
 
-        if (!progressed)
+    while(true)
+    {
+        bool didWork = false;
+        now = _now(); // Update time
+
+        // --- IMAGE ---
+        if (!m_pendingImage.isEmpty())
         {
-            int delay = 0;
-            delay = 50;
-            QTimer::singleShot(delay, this, [this, pump]()
+            if (m_inFlightImage < m_maxQueriesImageSameTime)
             {
-                (*pump)();
-            });
-        }
-        else
-        {
-            if (!m_pendingText.isEmpty())
-            {
-                QTimer::singleShot(0, this, [this, pump]()
+                qint64 elapsed = now - m_lastImageQueryStartTimeMs;
+                if (m_timeoutMsBetweenImageQueries > 0 && elapsed < m_timeoutMsBetweenImageQueries)
                 {
-                    (*pump)();
-                });
+                   // Throttled. Schedule wake up but DO NOT STOP checking text.
+                   // qWarning() << "Image throttled. Elapsed:" << elapsed << "Timeout:" << m_timeoutMsBetweenImageQueries;
+                   _requestPump(m_timeoutMsBetweenImageQueries - elapsed + 10);
+                }
+                else
+                {
+                    // Run Image
+                    auto job = m_pendingImage.dequeue();
+                    m_inFlightImage++;
+                    m_lastImageQueryStartTimeMs = now;
+                    didWork = true;
+
+                    auto guard = QSharedPointer<std::atomic_bool>::create(false);
+                    auto doneCallback = [this, guard]() {
+                        bool expected = false;
+                        if (guard->compare_exchange_strong(expected, true)) {
+                            m_inFlightImage--;
+                            if (m_inFlightImage < 0) m_inFlightImage = 0;
+                            _requestPump(0);
+                        }
+                    };
+
+                    try {
+                        job(doneCallback);
+                    } catch (...) {
+                        doneCallback();
+                    }
+                }
             }
         }
-    };
 
-    (*pump)();
+        // --- TEXT ---
+        if (!m_pendingText.isEmpty())
+        {
+             // qWarning() << "Checking Text Queue. Count:" << m_pendingText.size() << "InFlight:" << m_inFlightText << "Max:" << m_maxQueriesSameTime;
+             if (m_inFlightText < m_maxQueriesSameTime)
+             {
+                 auto job = m_pendingText.dequeue();
+                 // qWarning() << "Dequeued Text Job. Pending size now:" << m_pendingText.size();
+                 m_inFlightText++;
+                 didWork = true;
+
+                 auto guard = QSharedPointer<std::atomic_bool>::create(false);
+                 auto doneCallback = [this, guard]() {
+                     bool expected = false;
+                     if (guard->compare_exchange_strong(expected, true)) {
+                         m_inFlightText--;
+                         if (m_inFlightText < 0) m_inFlightText = 0;
+                         _requestPump(0);
+                     }
+                 };
+
+                 try {
+                     job(doneCallback);
+                 } catch (...) {
+                     doneCallback();
+                 }
+             }
+        }
+
+        if (!didWork) break;
+    }
+
+    m_pumping = false;
 }
 
 void OpenAi2::_runStepCollectN(const QSharedPointer<Step> &step,
@@ -1097,8 +1206,14 @@ void OpenAi2::_runStepCollectN(const QSharedPointer<Step> &step,
     QSharedPointer<std::function<void()>> one = QSharedPointer<std::function<void()>>::create();
     (*one) = [this, step, neededReplies, chooseBest, onBest, onFail, valids, attempts, one]()
     {
+        // Use a proxy step to prevent _runStepWithRetries from calling step->apply() on each attempt.
+        // We only want to apply the FINAL aggregated result.
+        // Copying *step (which references the functions/data) is cheap and safe (slicing is fine as usage is generic).
+        auto proxyStep = QSharedPointer<Step>::create(*step);
+        proxyStep->apply = nullptr;
+
         this->_runStepWithRetries(
-            step,
+            proxyStep,
             [this, neededReplies, chooseBest, onBest, onFail, valids, attempts, one](QString raw)
             {
                 valids->push_back(raw);
@@ -1123,6 +1238,8 @@ void OpenAi2::_runStepCollectN(const QSharedPointer<Step> &step,
                     }
                     return;
                 }
+
+
 
                 (*attempts) = (*attempts) + 1;
                 QTimer::singleShot(0, this, [this, one]()
@@ -1181,9 +1298,9 @@ void OpenAi2::_runStepCollectNThenAskBestAI(const QSharedPointer<Step> &step,
                 ok = true;
                 loop.quit();
             },
-            [&err, &ok, &loop](QString e)
+            [&err, &ok, &loop](TransportError e)
             {
-                err = e;
+                err = e.message;
                 ok = false;
                 loop.quit();
             });
