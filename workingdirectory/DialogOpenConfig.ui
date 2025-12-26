@@ -35,9 +35,6 @@
      </item>
      <item>
       <spacer name="horizontalSpacer_4">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
        <property name="sizeHint" stdset="0">
         <size>
          <width>40</width>
@@ -78,27 +75,7 @@
       </widget>
      </item>
      <item>
-      <widget class="Line" name="line">
-       <property name="orientation">
-        <enum>Qt::Orientation::Vertical</enum>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="buttonReadGtin">
-       <property name="toolTip">
-        <string>Read GTIN codes from GS1 results report</string>
-       </property>
-       <property name="text">
-        <string>Read GTIN</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <spacer name="horizontalSpacer">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
        <property name="sizeHint" stdset="0">
         <size>
          <width>40</width>
@@ -112,7 +89,7 @@
    <item>
     <widget class="QListWidget" name="listRecentPaths">
      <property name="selectionBehavior">
-      <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
+      <enum>QAbstractItemView::SelectItems</enum>
      </property>
     </widget>
    </item>
@@ -120,9 +97,6 @@
     <layout class="QHBoxLayout" name="horizontalLayout_6">
      <item>
       <spacer name="horizontalSpacer_5">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
        <property name="sizeHint" stdset="0">
         <size>
          <width>40</width>
