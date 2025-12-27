@@ -108,6 +108,15 @@ void OpenAi2::init(const QString &apiKey
     m_timeoutMsBetweenImageQueries = timeoutMsBetweenImageQueries;
 }
 
+qint64 OpenAi2::_now() const
+{
+#ifdef OPENAI2_UNIT_TESTS
+    if (m_timeProvider) return m_timeProvider();
+#endif
+    return QDateTime::currentMSecsSinceEpoch();
+}
+
+
 #ifdef OPENAI2_UNIT_TESTS
 void OpenAi2::setTransportForTests(std::function<void(const QString&, const QString&, const QList<QString>&, std::function<void(QString)>, std::function<void(TransportError)>)> transport)
 {
@@ -140,14 +149,6 @@ void OpenAi2::setTimeProviderForTests(std::function<qint64()> provider)
     m_timeProvider = provider;
 }
 
-
-qint64 OpenAi2::_now() const
-{
-#ifdef OPENAI2_UNIT_TESTS
-    if (m_timeProvider) return m_timeProvider();
-#endif
-    return QDateTime::currentMSecsSinceEpoch();
-}
 
 OpenAi2::DebugState OpenAi2::getDebugStateForTests() const
 {
