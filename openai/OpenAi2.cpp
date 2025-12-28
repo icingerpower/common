@@ -188,7 +188,7 @@ void OpenAi2::askGpt(const QList<QSharedPointer<Step>> &stepsInQueue, const QStr
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
-        throw ex;
+        ex.raise();
     }
 
     QList<QSharedPointer<Step>> steps;
@@ -245,7 +245,7 @@ void OpenAi2::_runMultipleTime(
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
-        throw ex;
+        ex.raise();
     }
     
     Q_UNUSED(model); // model is usually inside step or handled by runStep logic
@@ -302,7 +302,7 @@ void OpenAi2::askGptMultipleTimeAi(const QList<QSharedPointer<StepMultipleAskAi>
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
-        throw ex;
+        ex.raise();
     }
 
     QList<QSharedPointer<Step>> steps;
@@ -339,7 +339,7 @@ void OpenAi2::askGptBatch(const QList<QSharedPointer<Step>> &stepsIndependants,
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
-        throw ex;
+        ex.raise();
     }
 
     QList<QSharedPointer<Step>> steps;
@@ -366,7 +366,7 @@ void OpenAi2::askGptBatchMultipleTime(const QList<QSharedPointer<StepMultipleAsk
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
-        throw ex;
+        ex.raise();
     }
 
     QList<QSharedPointer<Step>> steps;
@@ -404,7 +404,7 @@ void OpenAi2::askGptBatchMultipleTimeAi(const QList<QSharedPointer<StepMultipleA
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
-        throw ex;
+        ex.raise();
     }
 
     QList<QSharedPointer<Step>> steps;
@@ -441,7 +441,7 @@ void OpenAi2::_runQueue(const QList<QSharedPointer<Step>> &steps,
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
-        throw ex;
+        ex.raise();
     }
 
     if (steps.isEmpty())
@@ -517,7 +517,7 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
-        throw ex;
+        ex.raise();
     }
 
 
@@ -754,13 +754,13 @@ void OpenAi2::_callResponses_Real(const QString &model,
     if (!m_initialized)
     {
         ExceptionOpenAiNotInitialized ex;
-        throw ex;
+        ex.raise();
     }
 
     if (m_openAiKey.trimmed().isEmpty())
     {
         ExceptionOpenAiNotInitialized ex;
-        throw ex;
+        ex.raise();
     }
 
 
