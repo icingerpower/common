@@ -280,6 +280,27 @@ QDataStream & operator >> (
     return stream;
 }
 //----------------------------------------
+QDataStream & operator << (QDataStream &stream, const QMap<QString, bool> &mapOfStringBool)
+{
+    QStringList keys = mapOfStringBool.keys();
+    stream << keys;
+    for (auto itPair=mapOfStringBool.begin(); itPair!=mapOfStringBool.end(); ++itPair) {
+        stream << itPair.value();
+    }
+    return stream;
+}
+//----------------------------------------
+QDataStream & operator >> (QDataStream &stream, QMap<QString, bool> &mapOfStringBool)
+{
+    QStringList keys;
+    stream >> keys;
+    for (auto itKey = keys.begin();
+         itKey != keys.end(); ++itKey) {
+        stream >> mapOfStringBool[*itKey];
+    }
+    return stream;
+}
+//----------------------------------------
 QDataStream & operator << (
         QDataStream &stream,
         const QHash<QString, QVariant> &hashOfStringVariant) {

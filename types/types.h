@@ -40,6 +40,9 @@ QDataStream & operator >> (QDataStream &stream, QHash<int, QDateTime> &hashOfInt
 QDataStream & operator << (QDataStream &stream, const QHash<QString, QString> &hashOfStrings);
 QDataStream & operator >> (QDataStream &stream, QHash<QString, QString> &hashOfStrings);
 
+QDataStream & operator << (QDataStream &stream, const QMap<QString, bool> &mapOfStringBool);
+QDataStream & operator >> (QDataStream &stream, QMap<QString, bool> &mapOfStringBool);
+
 QDataStream & operator << (QDataStream &stream, const QHash<QString, bool> &hashOfStringBool);
 QDataStream & operator >> (QDataStream &stream, QHash<QString, bool> &hashOfStringBool);
 
