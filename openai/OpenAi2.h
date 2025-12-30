@@ -102,6 +102,10 @@ public:
             const QList<QSharedPointer<StepMultipleAskAi>> &stepsInQueue
             , const QString &model
             );
+    QCoro::Task<void> askGptMultipleTimeAiCoro(
+            const QList<QSharedPointer<StepMultipleAskAi>> &stepsInQueue
+            , const QString &model
+            );
 
     void askGptBatch(
             const QList<QSharedPointer<Step>> &stepsIndependants

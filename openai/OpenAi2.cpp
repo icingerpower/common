@@ -331,6 +331,61 @@ void OpenAi2::askGptMultipleTimeAi(const QList<QSharedPointer<StepMultipleAskAi>
     Q_UNUSED(model);
 }
 
+QCoro::Task<void> OpenAi2::askGptMultipleTimeAiCoro(const QList<QSharedPointer<StepMultipleAskAi>> &stepsInQueue, const QString &model)
+{
+    // Use QSharedPointer to share the promise state safely across lambdas
+    auto promise = QSharedPointer<QFutureInterface<void>>::create();
+    promise->reportStarted();
+    QFuture<void> future = promise->future();
+
+    if (stepsInQueue.isEmpty())
+    {
+        promise->reportFinished();
+        co_return;
+    }
+
+    QSharedPointer<int> idx = QSharedPointer<int>::create(0);
+    QSharedPointer<std::function<void()>> runNext = QSharedPointer<std::function<void()>>::create();
+
+    *runNext = [this, stepsInQueue, idx, runNext, promise]()
+    {
+        if ((*idx) >= stepsInQueue.size())
+        {
+            promise->reportFinished();
+            return;
+        }
+
+        auto step = stepsInQueue[*idx];
+
+        this->_runStepCollectNThenAskBestAI(
+            qSharedPointerCast<Step>(step),
+            step->neededReplies,
+            step->getPromptGetBestReply,
+            [step](const QString &r) {
+                return step->validateBestReply ? step->validateBestReply(r, "") : true;
+            },
+            [step, idx, runNext](QString best)
+            {
+                if (step->apply)
+                {
+                    step->apply(best);
+                }
+                (*idx) = (*idx) + 1;
+                QTimer::singleShot(0, [runNext](){ (*runNext)(); });
+            },
+            [idx, promise](QString err)
+            {
+                qWarning() << "askGptMultipleTimeAiCoro failed step" << *idx << ":" << err;
+                promise->reportFinished();
+            }
+        );
+    };
+
+    (*runNext)();
+
+    co_await future;
+}
+
 void OpenAi2::askGptBatch(const QList<QSharedPointer<Step>> &stepsIndependants,
                           const QString &model,
                           const QString &progressCsvFilePath,
