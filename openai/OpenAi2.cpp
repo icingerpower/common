@@ -1028,6 +1028,7 @@ void OpenAi2::_callResponses_Real(const QString &model,
 
 bool OpenAi2::_tryLoadCache(const Step &step, QString *rawOut) const
 {
+    return false; // Keep this as we don't want a cache. In production, every failed query will returns forever a failed reply otherwise.
     if (rawOut == nullptr)
     {
         return false;
