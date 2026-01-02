@@ -809,6 +809,15 @@ void OpenAi2::_onInternalCallError(const TransportError &err)
     }
 }
 
+int OpenAi2::maxQueriesSameTime() const
+{
+    return m_maxQueriesSameTime;
+}
+
+void OpenAi2::setMaxQueriesSameTime(int newMaxQueriesSameTime)
+{
+    m_maxQueriesSameTime = newMaxQueriesSameTime;
+}
 
 void OpenAi2::_callResponses_Real(const QString &model,
                              const QString &prompt,

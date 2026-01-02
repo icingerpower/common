@@ -129,6 +129,9 @@ public:
             , int nQueriesLeftForNonBatch
             );
 
+    int maxQueriesSameTime() const;
+    void setMaxQueriesSameTime(int newMaxQueriesSameTime);
+
 private:
     OpenAi2(QObject *parent = nullptr);
     // Executes a queue sequentially (or with concurrency later)
