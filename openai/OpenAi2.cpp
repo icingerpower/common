@@ -662,6 +662,11 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
                     {
                         // FAIL: retries exhausted. 
                         // CRITICAL FIX: Do NOT apply() or cache() invalid/failed result.
+                        if (step->onLastError)
+                        {
+                            step->onLastError(raw, QNetworkReply::NoError, *lastWhy);
+                        }
+
                         if (onStepFailure)
                         {
                             onStepFailure(*lastWhy);
@@ -707,6 +712,11 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
 
                 if ((*attempt) >= maxRetries)
                 {
+                    if (step->onLastError)
+                    {
+                        step->onLastError("", err.networkError, err.message);
+                    }
+
                     if (onStepFailure)
                     {
                         onStepFailure(err.message);
@@ -915,7 +925,6 @@ void OpenAi2::_callResponses_Real(const QString &model,
         httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
         QNetworkReply::NetworkError netErr = reply->error();
-        const QVariant wwwAuth = reply->rawHeader("www-authenticate");
         qWarning() << "Body (first 1024):" << QString::fromUtf8(body.left(1024));
 
         if (netErr != QNetworkReply::NoError)
@@ -929,6 +938,7 @@ void OpenAi2::_callResponses_Real(const QString &model,
                       .arg(QString::fromUtf8(body.left(512)));
             err.isRetryable = true;
             err.isFatal = false;
+            err.networkError = netErr;
 
             if (onErr)
             {

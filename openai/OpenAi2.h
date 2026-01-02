@@ -27,6 +27,7 @@ public:
         QString message;
         bool isRetryable = true;
         bool isFatal = false;
+        QNetworkReply::NetworkError networkError = QNetworkReply::UnknownNetworkError;
     };
 
     struct DebugState {
@@ -57,6 +58,8 @@ public:
         std::function<QString(int nAttempts)> getPrompt;
         std::function<void(const QString &gptReply)> apply;
         std::function<bool(const QString &gptReply, const QString &lastWhy)> validate; // Last why help to know the kind of error
+        std::function<bool(const QString &gptReply, QNetworkReply::NetworkError networkError, const QString &error)> onLastError; // called if only failure when maxRetries is reached
+
         int maxRetries = 10;
         QString getGptModel(int attempt) const;
     };
