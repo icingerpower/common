@@ -919,6 +919,18 @@ void OpenAi2::_callResponses_Real(const QString &model,
     QNetworkReply *reply = nullptr;
     reply = m_networkAccessManager.post(req, payload);
 
+    // Timeout protection
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->start(120000); // 120s timeout
+    QObject::connect(timeoutTimer, &QTimer::timeout, reply, [reply](){
+        if (reply->isRunning())
+        {
+            qWarning() << "OpenAi2 request timed out, aborting...";
+            reply->abort();
+        }
+    });
+
     QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, onOk, onErr]()
     {
         // Helper to cleanup reply. 
@@ -1170,6 +1182,7 @@ void OpenAi2::_pumpLoop()
     
     // Debug logging for T2
     // qWarning() << "_pumpLoop start. Now:" << now << "BlockedUntil:" << m_blockedUntilMs << "InFlightTxt:" << m_inFlightText << "InFlightImg:" << m_inFlightImage;
+    // qWarning() << "_pumpLoop start. Now:" << now << "BlockedUntil:" << m_blockedUntilMs << "InFlightTxt:" << m_inFlightText << "InFlightImg:" << m_inFlightImage;
 
     // 1. Blocked Until Check
     if (m_blockedUntilMs > now)
@@ -1290,7 +1303,7 @@ void OpenAi2::_runStepCollectN(const QSharedPointer<Step> &step,
 
         this->_runStepWithRetries(
             proxyStep,
-            [this, neededReplies, chooseBest, onBest, onFail, valids, attempts, one](QString raw)
+            [this, neededReplies, chooseBest, onBest, onFail, valids, step, attempts, one](QString raw)
             {
                 valids->push_back(raw);
 
