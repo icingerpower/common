@@ -90,23 +90,23 @@ public:
 
 
     void askGpt(
-            const QList<QSharedPointer<Step>> &stepsInQueue
+            const QList<QSharedPointer<Step>> &stepsInQueue // The next one is launched once the previous one is finished
             , const QString &model
             );
     void askGptMultipleTime(
-            const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue
+            const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue // The next one is launched once the previous one is finished
             , const QString &model
             );
     QCoro::Task<void> askGptMultipleTimeCoro(
-            const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue
+            const QList<QSharedPointer<StepMultipleAsk>> &stepsInQueue // The next one is launched once the previous one is finished
             , const QString &model
             );
     void askGptMultipleTimeAi(
-            const QList<QSharedPointer<StepMultipleAskAi>> &stepsInQueue
+            const QList<QSharedPointer<StepMultipleAskAi>> &stepsInQueue // The next one is launched once the previous one is finished
             , const QString &model
             );
     QCoro::Task<void> askGptMultipleTimeAiCoro(
-            const QList<QSharedPointer<StepMultipleAskAi>> &stepsInQueue
+            const QList<QSharedPointer<StepMultipleAskAi>> &stepsInQueue // The next one is launched once the previous one is finished
             , const QString &model
             );
 
