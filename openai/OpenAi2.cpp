@@ -1369,45 +1369,73 @@ void OpenAi2::_runStepCollectNThenAskBestAI(const QSharedPointer<Step> &step,
             prompt = getPromptGetBestReply((*attempt), valids);
         }
 
+        struct AskBestContext {
+            QString bestRaw;
+            QString err;
+            bool ok = false;
+            QEventLoop* loop = nullptr;
+        };
+        auto ctx = QSharedPointer<AskBestContext>::create();
+
         QEventLoop loop;
-        QString bestRaw;
-        bestRaw = "";
-        QString err;
-        err = "";
-        bool ok = false;
-        ok = false;
+        ctx->loop = &loop;
 
         this->_callResponses(
             step->gptModel,
             prompt,
             QList<QString>(),
-            [&bestRaw, &ok, &loop](QString raw)
+            [ctx](QString raw)
             {
-                bestRaw = raw;
-                ok = true;
-                loop.quit();
+                if (ctx->loop)
+                {
+                    ctx->bestRaw = raw;
+                    ctx->ok = true;
+                    ctx->loop->quit();
+                }
             },
-            [&err, &ok, &loop](TransportError e)
+            [ctx](TransportError e)
             {
-                err = e.message;
-                ok = false;
-                loop.quit();
+                if (ctx->loop)
+                {
+                    ctx->err = e.message;
+                    ctx->ok = false;
+                    ctx->loop->quit();
+                }
             });
 
-        loop.exec();
+        QTimer timer;
+        timer.setSingleShot(true);
+        QObject::connect(&timer, &QTimer::timeout, &loop, [ctx]()
+        {
+            if (ctx->loop)
+            {
+                ctx->err = "timeout";
+                ctx->ok = false;
+                ctx->loop->quit();
+            }
+        });
+        
+        int timeoutMs = 60000;
+#ifdef OPENAI2_UNIT_TESTS
+        timeoutMs = 1000; 
+#endif
+        timer.start(timeoutMs);
 
-        if (!ok)
+        loop.exec();
+        ctx->loop = nullptr;
+
+        if (!ctx->ok)
         {
             if (onFail)
             {
-                onFail(err);
+                onFail(ctx->err);
             }
             return "";
         }
 
         if (validateBest)
         {
-            if (!validateBest(bestRaw))
+            if (!validateBest(ctx->bestRaw))
             {
                 if (onFail)
                 {
@@ -1417,7 +1445,7 @@ void OpenAi2::_runStepCollectNThenAskBestAI(const QSharedPointer<Step> &step,
             }
         }
 
-        return bestRaw;
+        return ctx->bestRaw;
     };
 
     this->_runStepCollectN(
