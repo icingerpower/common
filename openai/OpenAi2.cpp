@@ -16,7 +16,7 @@
 #include <QDateTime>
 #include <QDir>
 
-//#include "ExceptionOpenAiError.h"
+#include "ExceptionOpenAiError.h"
 #include "ExceptionOpenAiNotInitialized.h"
 
 #include "OpenAi2.h"
@@ -229,6 +229,9 @@ QCoro::Task<void> OpenAi2::askGptMultipleTimeCoro(
         [promise](QString err) {
              qWarning() << "askGptMultipleTimeCoro failed:" << err;
              // Always finish the future to unblock the awaiter.
+             ExceptionOpenAiError ex;
+             ex.setError(err);
+             promise->reportException(ex);
              promise->reportFinished();
         }
     );
@@ -376,6 +379,9 @@ QCoro::Task<void> OpenAi2::askGptMultipleTimeAiCoro(const QList<QSharedPointer<S
             [idx, promise](QString err)
             {
                 qWarning() << "askGptMultipleTimeAiCoro failed step" << *idx << ":" << err;
+                ExceptionOpenAiError ex;
+                ex.setError(err);
+                promise->reportException(ex);
                 promise->reportFinished();
             }
         );
