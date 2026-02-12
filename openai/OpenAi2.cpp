@@ -269,6 +269,7 @@ void OpenAi2::_runMultipleTime(
         if ((*idx) >= stepsInQueue.size())
         {
             if (onAllSuccess) onAllSuccess();
+            QTimer::singleShot(0, [runNext](){ *runNext = nullptr; });
             return;
         }
 
@@ -288,11 +289,12 @@ void OpenAi2::_runMultipleTime(
                 (*idx) = (*idx) + 1;
                 QTimer::singleShot(0, [runNext](){ (*runNext)(); });
             },
-            [idx, onAllFailure](QString err)
+            [idx, onAllFailure, runNext](QString err)
             {
                 qWarning() << "askGptMultipleTime failed step" << *idx << ":" << err;
                 // Stop execution on failure, consistent with _runQueue
                 if (onAllFailure) onAllFailure(err);
+                QTimer::singleShot(0, [runNext](){ *runNext = nullptr; });
             }
         );
     };
@@ -355,6 +357,7 @@ QCoro::Task<void> OpenAi2::askGptMultipleTimeAiCoro(const QList<QSharedPointer<S
         if ((*idx) >= stepsInQueue.size())
         {
             promise->reportFinished();
+            QTimer::singleShot(0, [runNext](){ *runNext = nullptr; });
             return;
         }
 
@@ -376,13 +379,14 @@ QCoro::Task<void> OpenAi2::askGptMultipleTimeAiCoro(const QList<QSharedPointer<S
                 (*idx) = (*idx) + 1;
                 QTimer::singleShot(0, [runNext](){ (*runNext)(); });
             },
-            [idx, promise](QString err)
+            [idx, promise, runNext](QString err)
             {
                 qWarning() << "askGptMultipleTimeAiCoro failed step" << *idx << ":" << err;
                 ExceptionOpenAiError ex;
                 ex.setError(err);
                 promise->reportException(ex);
                 promise->reportFinished();
+                QTimer::singleShot(0, [runNext](){ *runNext = nullptr; });
             }
         );
     };
@@ -540,6 +544,7 @@ void OpenAi2::_runQueue(const QList<QSharedPointer<Step>> &steps,
                     onAllFailure(*firstError);
                 }
             }
+            QTimer::singleShot(0, [runNext](){ *runNext = nullptr; });
             return;
         }
 
@@ -677,6 +682,7 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
                         {
                             onStepFailure(*lastWhy);
                         }
+                        QTimer::singleShot(0, [doAttempt](){ *doAttempt = nullptr; });
                         return;
                     }
 
@@ -696,6 +702,7 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
                 {
                     onStepSuccess(raw);
                 }
+                QTimer::singleShot(0, [doAttempt](){ *doAttempt = nullptr; });
             },
             [this, step, attempt, lastWhy, onStepFailure, doAttempt](TransportError err)
             {
@@ -727,6 +734,7 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
                     {
                         onStepFailure(err.message);
                     }
+                    QTimer::singleShot(0, [doAttempt](){ *doAttempt = nullptr; });
                     return;
                 }
 
@@ -1331,6 +1339,7 @@ void OpenAi2::_runStepCollectN(const QSharedPointer<Step> &step,
                     {
                         onBest(best);
                     }
+                    QTimer::singleShot(0, [one](){ *one = nullptr; });
                     return;
                 }
 
@@ -1342,12 +1351,13 @@ void OpenAi2::_runStepCollectN(const QSharedPointer<Step> &step,
                     (*one)();
                 });
             },
-            [this, onFail](QString err)
+            [this, onFail, one](QString err)
             {
                 if (onFail)
                 {
                     onFail(err);
                 }
+                QTimer::singleShot(0, [one](){ *one = nullptr; });
             });
     };
     (*one)();
@@ -1361,105 +1371,124 @@ void OpenAi2::_runStepCollectNThenAskBestAI(const QSharedPointer<Step> &step,
                                             std::function<void(QString best)> onBest,
                                             std::function<void(QString err)> onFail)
 {
-    std::function<QString(const QList<QString> &)> chooseBest;
-    chooseBest = [this, step, getPromptGetBestReply, validateBest, onFail](const QList<QString> &valids) -> QString
+    // Use _runStepCollectN to get the N replies first
+    // Then, in the success callback, launch the AI "best selection" step asynchronously
+    
+    // We need to capture 'this' and the necessary functions for the second phase
+    // Note: We capture by value or shared pointer where appropriate to ensure lifetime
+    
+    auto chooseBest = [this, step, getPromptGetBestReply, validateBest, onBest, onFail](const QList<QString> &valids)
     {
-        QSharedPointer<int> attempt;
-        attempt = QSharedPointer<int>::create(0);
-
-        QString prompt;
-        prompt = "";
-
-        if (getPromptGetBestReply)
-        {
-            prompt = getPromptGetBestReply((*attempt), valids);
-        }
-
-        struct AskBestContext {
-            QString bestRaw;
-            QString err;
-            bool ok = false;
-            QEventLoop* loop = nullptr;
-        };
-        auto ctx = QSharedPointer<AskBestContext>::create();
-
-        QEventLoop loop;
-        ctx->loop = &loop;
-
-        this->_callResponses(
-            step->gptModel,
-            prompt,
-            QList<QString>(),
-            [ctx](QString raw)
-            {
-                if (ctx->loop)
-                {
-                    ctx->bestRaw = raw;
-                    ctx->ok = true;
-                    ctx->loop->quit();
-                }
-            },
-            [ctx](TransportError e)
-            {
-                if (ctx->loop)
-                {
-                    ctx->err = e.message;
-                    ctx->ok = false;
-                    ctx->loop->quit();
-                }
-            });
-
-        QTimer timer;
-        timer.setSingleShot(true);
-        QObject::connect(&timer, &QTimer::timeout, &loop, [ctx]()
-        {
-            if (ctx->loop)
-            {
-                ctx->err = "timeout";
-                ctx->ok = false;
-                ctx->loop->quit();
-            }
-        });
+        // This function is now just a bridge to launch the next async step.
+        // It returns an empty string because _runStepCollectN expects a result immediately,
+        // but we are hijacking the flow. Ideally _runStepCollectN would be async too
+        // or we reimplement the logic here.
+        // Actually, _runStepCollectN CALLS the chooseBest function effectively synchronously 
+        // inside its completion callback.
+        // So we can trigger the next async step here.
         
-        int timeoutMs = 60000;
-#ifdef OPENAI2_UNIT_TESTS
-        timeoutMs = 1000; 
-#endif
-        timer.start(timeoutMs);
-
-        loop.exec();
-        ctx->loop = nullptr;
-
-        if (!ctx->ok)
-        {
-            if (onFail)
-            {
-                onFail(ctx->err);
-            }
-            return "";
-        }
-
-        if (validateBest)
-        {
-            if (!validateBest(ctx->bestRaw))
-            {
-                if (onFail)
-                {
-                    onFail("validate_best_failed");
-                }
-                return "";
-            }
-        }
-
-        return ctx->bestRaw;
+        // However, _runStepCollectN expects chooseBest to return a QString result to pass to onBest.
+        // But onBest is passed by us below.
+        
+        // Let's reimplement similar logic to _runStepCollectN but chained.
+        return QString(); 
     };
+    
+    // RE-IMPLEMENTATION of CollectN logic + Chaining
+    // To avoid "chooseBest" needing to return a string immediately.
+    
+    if (neededReplies <= 0)
+    {
+        if (onFail) onFail("neededReplies<=0");
+        return;
+    }
 
-    this->_runStepCollectN(
-        step,
-        neededReplies,
-        chooseBest,
-        onBest,
-        onFail);
+    QSharedPointer<QList<QString>> valids = QSharedPointer<QList<QString>>::create();
+    QSharedPointer<int> attempts = QSharedPointer<int>::create(0);
+    QSharedPointer<std::function<void()>> one = QSharedPointer<std::function<void()>>::create();
+
+    (*one) = [this, step, neededReplies, getPromptGetBestReply, validateBest, onBest, onFail, valids, attempts, one]()
+    {
+        auto proxyStep = QSharedPointer<Step>::create(*step);
+        proxyStep->apply = nullptr;
+
+        this->_runStepWithRetries(
+            proxyStep,
+            [this, neededReplies, getPromptGetBestReply, validateBest, onBest, onFail, valids, step, attempts, one](QString raw)
+            {
+                valids->push_back(raw);
+
+                if (valids->size() >= neededReplies)
+                {
+                    // PHASE 1 DONE: We have N replies.
+                    // PHASE 2 START: Ask AI to choose best.
+                    
+                    QSharedPointer<int> attemptBest = QSharedPointer<int>::create(0);
+                    QSharedPointer<std::function<void()>> runBest = QSharedPointer<std::function<void()>>::create();
+                    
+                    *runBest = [this, step, valids, attemptBest, getPromptGetBestReply, validateBest, onBest, onFail, runBest]()
+                    {
+                        QString prompt = "";
+                        if (getPromptGetBestReply)
+                        {
+                            prompt = getPromptGetBestReply(*attemptBest, *valids);
+                        }
+                        
+                        // We use _callResponses directly, or better/safer: reuse _runStepWithRetries?
+                        // But _runStepWithRetries manages attempts logic based on 'step'.
+                        // Here we have a "virtual" step for choosing best.
+                        
+                        // Let's use _callResponses with manual retry logic similar to how it was done before, 
+                        // but ASYNC.
+                        
+                        // Actually, we can assume "selecting best" is like a single Step with retries.
+                        // Let's create a temporary Step for this phase 2.
+                        
+                        auto stepBest = QSharedPointer<Step>::create();
+                        stepBest->id = step->id + "_best";
+                        stepBest->gptModel = step->gptModel; // Use same model? Original code used step->gptModel
+                        stepBest->maxRetries = 5; // Arbitrary or reasonable default
+                        stepBest->getPrompt = [getPromptGetBestReply, valids](int a) {
+                             return getPromptGetBestReply(a, *valids);
+                        };
+                        stepBest->validate = [validateBest](const QString &r, const QString &) {
+                             if (validateBest) return validateBest(r);
+                             return true;
+                        };
+                        stepBest->apply = nullptr;
+                        
+                        // Use _runStepWithRetries for the second phase too!
+                        // This handles retries, errors, etc. correctly.
+                        this->_runStepWithRetries(
+                            stepBest,
+                            [onBest, runBest](QString bestRawMatch) {
+                                if (onBest) onBest(bestRawMatch);
+                                QTimer::singleShot(0, [runBest](){ *runBest = nullptr; });
+                            },
+                            [onFail, runBest](QString err) {
+                                if (onFail) onFail(err);
+                                QTimer::singleShot(0, [runBest](){ *runBest = nullptr; });
+                            }
+                        );
+                    };
+                    
+                    (*runBest)(); // Start Phase 2
+                    
+                    // Break Phase 1 cycle
+                    QTimer::singleShot(0, [one](){ *one = nullptr; });
+                    return;
+                }
+
+                (*attempts) = (*attempts) + 1;
+                QTimer::singleShot(0, this, [this, one](){ (*one)(); });
+            },
+            [this, onFail, one](QString err)
+            {
+                if (onFail) onFail(err);
+                QTimer::singleShot(0, [one](){ *one = nullptr; });
+            });
+    };
+    (*one)();
 }
 
 void OpenAi2::_runBatch(const QList<QSharedPointer<Step>> &steps,
@@ -1557,8 +1586,8 @@ void OpenAi2::_runBatch(const QList<QSharedPointer<Step>> &steps,
     QSharedPointer<QString> firstErr;
     firstErr = QSharedPointer<QString>::create("");
 
-    std::function<void()> runOne;
-    runOne = [this, todo, model, nFallbackNonBatch, &ts, &out, idx, firstErr, onAllSuccess, onAllFailure, &runOne]()
+    QSharedPointer<std::function<void()>> runOne = QSharedPointer<std::function<void()>>::create();
+    *runOne = [this, todo, model, nFallbackNonBatch, &ts, &out, idx, firstErr, onAllSuccess, onAllFailure, runOne]()
     {
         if ((*idx) >= todo.size())
         {
@@ -1579,6 +1608,7 @@ void OpenAi2::_runBatch(const QList<QSharedPointer<Step>> &steps,
                     onAllFailure(*firstErr);
                 }
             }
+            QTimer::singleShot(0, [runOne](){ *runOne = nullptr; });
             return;
         }
 
@@ -1594,7 +1624,7 @@ void OpenAi2::_runBatch(const QList<QSharedPointer<Step>> &steps,
 
         this->_runStepWithRetries(
             s,
-            [this, s, &ts, idx, &runOne](QString raw)
+            [this, s, &ts, idx, runOne](QString raw)
             {
                 QString safeRaw;
                 safeRaw = raw;
@@ -1605,20 +1635,20 @@ void OpenAi2::_runBatch(const QList<QSharedPointer<Step>> &steps,
                 ts.flush();
 
                 (*idx) = (*idx) + 1;
-                runOne();
+                (*runOne)();
             },
-            [this, idx, firstErr, &runOne](QString err)
+            [this, idx, firstErr, runOne](QString err)
             {
                 if (firstErr->isEmpty())
                 {
                     (*firstErr) = err;
                 }
                 (*idx) = (*idx) + 1;
-                runOne();
+                (*runOne)();
             });
     };
 
-    runOne();
+    (*runOne)();
 
     Q_UNUSED(model);
 }
