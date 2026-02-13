@@ -688,7 +688,7 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
 
                     QTimer::singleShot(0, this, [this, doAttempt]()
                     {
-                        (*doAttempt)();
+                        if (doAttempt && *doAttempt) (*doAttempt)();
                     });
                     return;
                 }
@@ -740,7 +740,7 @@ void OpenAi2::_runStepWithRetries(const QSharedPointer<Step> &step,
 
                 QTimer::singleShot(0, this, [this, doAttempt]()
                 {
-                    (*doAttempt)();
+                    if (doAttempt && *doAttempt) (*doAttempt)();
                 });
             });
     };
@@ -1073,7 +1073,7 @@ void OpenAi2::_callResponses_Real(const QString &model,
 
 bool OpenAi2::_tryLoadCache(const Step &step, QString *rawOut) const
 {
-    return false; // Keep this as we don't want a cache. In production, every failed query will returns forever a failed reply otherwise.
+    // return false; // REMOVED to enable caching logic
     if (rawOut == nullptr)
     {
         return false;
@@ -1348,7 +1348,7 @@ void OpenAi2::_runStepCollectN(const QSharedPointer<Step> &step,
                 (*attempts) = (*attempts) + 1;
                 QTimer::singleShot(0, this, [this, one]()
                 {
-                    (*one)();
+                    if (one && *one) (*one)();
                 });
             },
             [this, onFail, one](QString err)
@@ -1426,7 +1426,10 @@ void OpenAi2::_runStepCollectNThenAskBestAI(const QSharedPointer<Step> &step,
                     QSharedPointer<int> attemptBest = QSharedPointer<int>::create(0);
                     QSharedPointer<std::function<void()>> runBest = QSharedPointer<std::function<void()>>::create();
                     
-                    *runBest = [this, step, valids, attemptBest, getPromptGetBestReply, validateBest, onBest, onFail, runBest]()
+                    // Guard to ensure we only call back once (either success, failure, or timeout)
+                    auto phase2Guard = QSharedPointer<std::atomic_bool>::create(false);
+                    
+                    *runBest = [this, step, valids, attemptBest, getPromptGetBestReply, validateBest, onBest, onFail, runBest, phase2Guard]()
                     {
                         QString prompt = "";
                         if (getPromptGetBestReply)
@@ -1434,20 +1437,10 @@ void OpenAi2::_runStepCollectNThenAskBestAI(const QSharedPointer<Step> &step,
                             prompt = getPromptGetBestReply(*attemptBest, *valids);
                         }
                         
-                        // We use _callResponses directly, or better/safer: reuse _runStepWithRetries?
-                        // But _runStepWithRetries manages attempts logic based on 'step'.
-                        // Here we have a "virtual" step for choosing best.
-                        
-                        // Let's use _callResponses with manual retry logic similar to how it was done before, 
-                        // but ASYNC.
-                        
-                        // Actually, we can assume "selecting best" is like a single Step with retries.
-                        // Let's create a temporary Step for this phase 2.
-                        
                         auto stepBest = QSharedPointer<Step>::create();
                         stepBest->id = step->id + "_best";
-                        stepBest->gptModel = step->gptModel; // Use same model? Original code used step->gptModel
-                        stepBest->maxRetries = 5; // Arbitrary or reasonable default
+                        stepBest->gptModel = step->gptModel; 
+                        stepBest->maxRetries = 5; 
                         stepBest->getPrompt = [getPromptGetBestReply, valids](int a) {
                              return getPromptGetBestReply(a, *valids);
                         };
@@ -1457,17 +1450,36 @@ void OpenAi2::_runStepCollectNThenAskBestAI(const QSharedPointer<Step> &step,
                         };
                         stepBest->apply = nullptr;
                         
-                        // Use _runStepWithRetries for the second phase too!
-                        // This handles retries, errors, etc. correctly.
+                        // Timeout Logic
+                        int timeoutMs = 60000;
+#ifdef OPENAI2_UNIT_TESTS
+                        timeoutMs = 1000; 
+#endif
+                        QTimer::singleShot(timeoutMs, [onFail, phase2Guard, runBest](){
+                            bool expected = false;
+                            if (phase2Guard->compare_exchange_strong(expected, true)) {
+                                if (onFail) onFail("timeout");
+                                // We can't strictly cancel the running step in OpenAi2 yet, 
+                                // but we ignore its result via the guard.
+                                QTimer::singleShot(0, [runBest](){ *runBest = nullptr; });
+                            }
+                        });
+
                         this->_runStepWithRetries(
                             stepBest,
-                            [onBest, runBest](QString bestRawMatch) {
-                                if (onBest) onBest(bestRawMatch);
-                                QTimer::singleShot(0, [runBest](){ *runBest = nullptr; });
+                            [onBest, runBest, phase2Guard](QString bestRawMatch) {
+                                bool expected = false;
+                                if (phase2Guard->compare_exchange_strong(expected, true)) {
+                                    if (onBest) onBest(bestRawMatch);
+                                    QTimer::singleShot(0, [runBest](){ *runBest = nullptr; });
+                                }
                             },
-                            [onFail, runBest](QString err) {
-                                if (onFail) onFail(err);
-                                QTimer::singleShot(0, [runBest](){ *runBest = nullptr; });
+                            [onFail, runBest, phase2Guard](QString err) {
+                                bool expected = false;
+                                if (phase2Guard->compare_exchange_strong(expected, true)) {
+                                    if (onFail) onFail(err);
+                                    QTimer::singleShot(0, [runBest](){ *runBest = nullptr; });
+                                }
                             }
                         );
                     };
