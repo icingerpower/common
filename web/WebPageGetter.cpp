@@ -26,13 +26,12 @@ QString WebPageGetter::getPageContent(const QString &url)
 {
     QNetworkAccessManager networkManager;
     QSharedPointer<QString> content(new QString);
-    //*
     QSharedPointer<QEventLoop> loop(new QEventLoop);
     connect(&networkManager,
             &QNetworkAccessManager::finished,
+            this,
             [content, loop]
             (QNetworkReply *reply){
-        //*
         QString encodingHeader = reply->rawHeader(
                     "Content-Type");
         QString encoding = "UTF-8";
@@ -55,7 +54,6 @@ QString WebPageGetter::getPageContent(const QString &url)
         {
             Q_ASSERT(false);
         }
-        //*/
         loop->quit();
     });
     networkManager.get(
@@ -76,12 +74,7 @@ void WebPageGetter::waitBeforeNextQuery(
     }
     QDateTime currentDateTime = QDateTime::currentDateTime();
     qint64 elapsedSec = lastTimes[domain].secsTo(currentDateTime);
-    qint64 toSleep = 31;
     if (elapsedSec < sec) {
-        toSleep = sec - elapsedSec;
-        //SettingManager::sleepSec(sec - elapsedSec);
-    //} else {
-        //SettingManager::sleepSec(31); // We wait minimum 16 secs for shared server
         QDateTime targetTime
                 = QDateTime::currentDateTime().addSecs(sec);
         while (QDateTime::currentDateTime() < targetTime) {
@@ -158,7 +151,7 @@ void WebPageGetter::getGoogleLinks(
     if (includeGooglePages) {
         *p_urls << firstUrl;
     }
-    getPageContent(firstUrl, [=]( //TODO check that copy capture will be ok if initial variable are destroyed before end of exec
+    getPageContent(firstUrl, [=, this]( //TODO check that copy capture will be ok if initial variable are destroyed before end of exec
                    const QString &content) {
         int nPages = googleResultsPageCount_p(content);
         QStringList firstUrls = googleUrls_p(content);

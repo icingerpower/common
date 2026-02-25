@@ -13,6 +13,11 @@ CsvHeaderException *CsvHeaderException::clone() const
     return new CsvHeaderException(*this);
 }
 //----------------------------------------------------------
+QString CsvHeaderException::getErrorColumns(const QString &begin) const
+{
+    return begin + " " + m_columnValuesError.join("; ");
+}
+//----------------------------------------------------------
 QStringList CsvHeaderException::columnValuesError() const
 {
     return m_columnValuesError;
@@ -22,6 +27,16 @@ void CsvHeaderException::setColumnValuesError(const QStringList &columnValuesErr
 {
     m_columnValuesError = columnValuesError;
 }
+
+void CsvHeaderException::setFileName(const QString &fileName)
+{
+    m_fileName = fileName;
+}
+
+QString CsvHeaderException::getFileName() const
+{
+    return m_fileName;
+}
 //----------------------------------------------------------
 //----------------------------------------------------------
 //----------------------------------------------------------
@@ -29,9 +44,10 @@ CsvHeader::CsvHeader()
 {
 }
 //----------------------------------------------------------
-CsvHeader::CsvHeader(const QStringList &headerElements)
+CsvHeader::CsvHeader(const QStringList &headerElements, const QString &fileName)
 {
     setHeaderElements(headerElements);
+    m_fileName = fileName;
 }
 //----------------------------------------------------------
 int CsvHeader::pos(const QStringList &names) const
@@ -40,9 +56,10 @@ int CsvHeader::pos(const QStringList &names) const
     while (!m_headerPosition.contains(names[keyIndex])) {
         keyIndex++;
         if (keyIndex == names.length()) {
-            CsvHeaderException exeption;
-            exeption.setColumnValuesError(names);
-            exeption.raise();
+            CsvHeaderException exception;
+            exception.setColumnValuesError(names);
+            exception.setFileName(m_fileName);
+            exception.raise();
         }
     }
     return m_headerPosition[names[keyIndex]];
@@ -74,9 +91,10 @@ int CsvHeader::pos(const QString &name) const
     if (m_headerPosition.contains(name)) {
         pos = m_headerPosition[name];
     } else {
-        CsvHeaderException exeption;
-        exeption.setColumnValuesError({name});
-        exeption.raise();
+        CsvHeaderException exception;
+        exception.setColumnValuesError({name});
+        exception.setFileName(m_fileName);
+        exception.raise();
     }
     return pos;
 }
@@ -87,9 +105,9 @@ int CsvHeader::pos(const QString &name, const QString &customError) const
     if (m_headerPosition.contains(name)) {
         pos = m_headerPosition[name];
     } else {
-        CsvCustomerHeaderException exeption;
-        exeption.setError(customError);
-        exeption.raise();
+        CsvCustomerHeaderException exception;
+        exception.setError(customError);
+        exception.raise();
     }
     return pos;
 }

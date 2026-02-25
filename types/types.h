@@ -2,6 +2,7 @@
 #define TYPES_H
 
 #include <QStringList>
+#include <QDataStream>
 #include <QVariant>
 #include <QMetaType>
 #include <QSet>

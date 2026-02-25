@@ -11,11 +11,15 @@ public:
     void raise() const override;
     CsvHeaderException *clone() const override;
 
+    QString getErrorColumns(const QString &begin) const;
     QStringList columnValuesError() const;
     void setColumnValuesError(const QStringList &columnValuesError);
+    void setFileName(const QString &fileName);
+    QString getFileName() const;
 
 private:
     QStringList m_columnValuesError;
+    QString m_fileName;
 };
 
 class CsvCustomerHeaderException : public QException
@@ -36,7 +40,7 @@ class CsvHeader
 {
 public:
     CsvHeader();
-    CsvHeader(const QStringList &headerElements);
+    CsvHeader(const QStringList &headerElements, const QString &fileName);
     int pos(const QString &name) const;
     int pos(const QString &name, const QString &customError) const;
     int pos(const QStringList &names) const;
@@ -51,6 +55,7 @@ private:
     QStringList m_headerElements;
     QHash<QString, int> m_headerPosition;
     QHash<QString, QString> m_colVariantMap;
+    QString m_fileName;
 };
 
 #endif // CSVHEADER_H

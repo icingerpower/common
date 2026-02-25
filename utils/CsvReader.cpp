@@ -1,5 +1,6 @@
 #include <QFile>
 #include <QMap>
+#include <QFileInfo>
 
 #include "CsvReader.h"
 
@@ -144,7 +145,8 @@ bool CsvReader::readAll()
         }
         if (m_hasHeader) {
             QStringList headerElements = decodeLine(stream, bufferNext);
-            m_dataRode.header = CsvHeader(headerElements);
+            m_dataRode.header = CsvHeader{
+                    headerElements, QFileInfo{m_fileName}.fileName()};
         }
         while (!stream.atEnd()) {
             QStringList elementsLine = decodeLine(stream, bufferNext);
@@ -177,7 +179,8 @@ bool CsvReader::readAllOld()
             QString line = stream.readLine();
             // TODO here it can't work in return in csv line
             QStringList headerElements = decodeLine(line);
-            m_dataRode.header = CsvHeader(headerElements);
+            m_dataRode.header = CsvHeader{
+                    headerElements, QFileInfo{m_fileName}.fileName()};
         }
         do {
             line = stream.readLine();
@@ -213,7 +216,8 @@ bool CsvReader::readSomeLines(int nLines)
         QString line = stream.readLine();
         if (m_hasHeader) {
             QStringList headerElements = decodeLine(line);
-            m_dataRode.header = CsvHeader(headerElements);
+            m_dataRode.header = CsvHeader{
+                    headerElements, QFileInfo{m_fileName}.fileName()};
         }
         int curLine = 0;
         while (curLine < nLines) {

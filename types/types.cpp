@@ -247,7 +247,11 @@ QDataStream & operator >> (
         QHash<QString, QString> &hashOfStrings)
 {
     QStringList keys;
-    stream >> keys;
+    // stream >> keys;
+    QVariant varKeys;
+    stream >> varKeys;
+    keys = varKeys.toStringList();
+
     for (auto itKey = keys.begin();
          itKey != keys.end(); ++itKey) {
         stream >> hashOfStrings[*itKey];
@@ -272,7 +276,11 @@ QDataStream & operator >> (
         QHash<QString, bool> &hashOfStringBool)
 {
     QStringList keys;
-    stream >> keys;
+    // stream >> keys;
+    QVariant varKeys;
+    stream >> varKeys;
+    keys = varKeys.toStringList();
+
     for (auto itKey = keys.begin();
          itKey != keys.end(); ++itKey) {
         stream >> hashOfStringBool[*itKey];
@@ -293,7 +301,11 @@ QDataStream & operator << (QDataStream &stream, const QMap<QString, bool> &mapOf
 QDataStream & operator >> (QDataStream &stream, QMap<QString, bool> &mapOfStringBool)
 {
     QStringList keys;
-    stream >> keys;
+    // stream >> keys;
+    QVariant varKeys;
+    stream >> varKeys;
+    keys = varKeys.toStringList();
+
     for (auto itKey = keys.begin();
          itKey != keys.end(); ++itKey) {
         stream >> mapOfStringBool[*itKey];
@@ -317,7 +329,11 @@ QDataStream & operator >> (
         QDataStream &stream,
         QHash<QString, QVariant> &hashOfStringVariant) {
     QStringList keys;
-    stream >> keys;
+    // stream >> keys;
+    QVariant varKeys;
+    stream >> varKeys;
+    keys = varKeys.toStringList();
+
     for (auto itKey = keys.begin();
          itKey != keys.end(); ++itKey) {
         stream >> hashOfStringVariant[*itKey];
@@ -340,7 +356,11 @@ QDataStream & operator << (QDataStream &stream, const QHash<QString, QDateTime> 
 QDataStream & operator >> (QDataStream &stream, QHash<QString, QDateTime> &hashOfStringDateTime)
 {
     QStringList keys;
-    stream >> keys;
+    // stream >> keys;
+    QVariant varKeys;
+    stream >> varKeys;
+    keys = varKeys.toStringList();
+
     for (auto itKey = keys.begin();
          itKey != keys.end(); ++itKey) {
         stream >> hashOfStringDateTime[*itKey];
@@ -365,7 +385,11 @@ QDataStream & operator >> (
         QDataStream &stream,
         QHash<QString, QDate> &hashOfStringDate) {
     QStringList keys;
-    stream >> keys;
+    // stream >> keys;
+    QVariant varKeys;
+    stream >> varKeys;
+    keys = varKeys.toStringList();
+
     for (auto itKey = keys.begin();
          itKey != keys.end(); ++itKey) {
         stream >> hashOfStringDate[*itKey];
@@ -388,7 +412,11 @@ QDataStream & operator << (QDataStream &stream, const QHash<QString, QMap<QDate,
 QDataStream & operator >> (QDataStream &stream, QHash<QString, QMap<QDate, int>> &hashOfStringDateInt)
 {
     QStringList keys;
-    stream >> keys;
+    // stream >> keys;
+    QVariant varKeys;
+    stream >> varKeys;
+    keys = varKeys.toStringList();
+
     for (const auto &key : keys)
     {
         stream >> hashOfStringDateInt[key];
@@ -411,7 +439,11 @@ QDataStream & operator << (QDataStream &stream, const QHash<QString, QList<QDate
 QDataStream & operator >> (QDataStream &stream, QHash<QString, QList<QDate>> &hashOfStringListDate)
 {
     QStringList keys;
-    stream >> keys;
+    // stream >> keys;
+    QVariant varKeys;
+    stream >> varKeys;
+    keys = varKeys.toStringList();
+
     for (const auto &key : keys)
     {
         stream >> hashOfStringListDate[key];
@@ -434,7 +466,11 @@ QDataStream & operator << (QDataStream &stream, const QHash<QString, QSet<QStrin
 QDataStream & operator >> (QDataStream &stream, QHash<QString, QSet<QString>> &hashOfStringSet)
 {
     QStringList keys;
-    stream >> keys;
+    // stream >> keys;
+    QVariant varKeys;
+    stream >> varKeys;
+    keys = varKeys.toStringList();
+
     for (const auto &key : keys)
     {
         stream >> hashOfStringSet[key];
@@ -508,12 +544,20 @@ QDataStream & operator << (QDataStream &stream, const QHash<QString, QHash<QStri
 QDataStream & operator >> (QDataStream &stream, QHash<QString, QHash<QString, QString>> &hashOfHashString)
 {
     QStringList keys1;
-    stream >> keys1;
+    // stream >> keys1;
+    QVariant varKeys1;
+    stream >> varKeys1;
+    keys1 = varKeys1.toStringList();
+
     for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1)
     {
         hashOfHashString[*itKey1] = QHash<QString, QString>();
         QStringList keys2;
-        stream >> keys2;
+        // stream >> keys2;
+        QVariant varKeys2;
+        stream >> varKeys2;
+        keys2 = varKeys2.toStringList();
+
         for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2)
         {
             QString value;
@@ -549,11 +593,19 @@ QDataStream & operator >> (
         QHash<QString, QHash<QString, double>> &hashOfHashDouble)
 {
     QStringList keys1;
-    stream >> keys1;
+    // stream >> keys1;
+    QVariant varKeys1;
+    stream >> varKeys1;
+    keys1 = varKeys1.toStringList();
+
     for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1) {
         hashOfHashDouble[*itKey1] = QHash<QString, double>();
         QStringList keys2;
-        stream >> keys2;
+        // stream >> keys2;
+        QVariant varKeys2;
+        stream >> varKeys2;
+        keys2 = varKeys2.toStringList();
+
         for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2) {
             /*
             QString valueStr;
@@ -594,12 +646,20 @@ QDataStream & operator >> (QDataStream &stream,
                         QHash<QString, QHash<QString, QVariant>> &hashOfHashVariant)
 {
     QStringList keys1;
-    stream >> keys1;
+    // stream >> keys1;
+    QVariant varKeys1;
+    stream >> varKeys1;
+    keys1 = varKeys1.toStringList();
+
     for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1)
     {
         hashOfHashVariant[*itKey1] = QHash<QString, QVariant>();
         QStringList keys2;
-        stream >> keys2;
+        // stream >> keys2;
+        QVariant varKeys2;
+        stream >> varKeys2;
+        keys2 = varKeys2.toStringList();
+
         for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2)
         {
             QVariant value;
@@ -631,7 +691,11 @@ QDataStream & operator >> (
         QDataStream &stream,
         QHash<QString, QMap<QDate, QHash<QString, double>>> &hashOfMapOfHashDouble) {
     QStringList keys1;
-    stream >> keys1;
+    // stream >> keys1;
+    QVariant varKeys1;
+    stream >> varKeys1;
+    keys1 = varKeys1.toStringList();
+
     for (auto itKey1 = keys1.begin(); itKey1->end(); ++itKey1) {
         QList<QDate> keys2;
         stream >> keys2;
@@ -661,11 +725,17 @@ QDataStream & operator << (
 QDataStream & operator >> (
         QDataStream &stream,
         QHash<QString, QHash<QString, QMap<QDate, QVariant>>> &hashOfHaghOfMapDateVariant) {
-    QStringList keys1;
-    stream >> keys1;
-    for (auto itKey1 = keys1.begin(); itKey1->end(); ++itKey1) {
+    QVariant varKeys1;
+    stream >> varKeys1;
+    QStringList keys1 = varKeys1.toStringList();
+
+    for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1) {
         QStringList keys2;
-        stream >> keys2;
+        // stream >> keys2;
+        QVariant varKeys2;
+        stream >> varKeys2;
+        keys2 = varKeys2.toStringList();
+        
         for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2) {
             stream >> hashOfHaghOfMapDateVariant[*itKey1][*itKey2];
         }
@@ -721,10 +791,18 @@ QDataStream & operator >> (
         QHash<QString, QHash<QString, QSet<QString>>> &hashOfHaghOfVariantSet)
 {
     QStringList keys1;
-    stream >> keys1;
+    // stream >> keys1;
+    QVariant varKeys1;
+    stream >> varKeys1;
+    keys1 = varKeys1.toStringList();
+
     for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1) {
         QStringList keys2;
-        stream >> keys2;
+        // stream >> keys2;
+        QVariant varKeys2;
+        stream >> varKeys2;
+        keys2 = varKeys2.toStringList();
+
         for (auto itKey2 = keys2.begin(); itKey2 != keys2.end(); ++itKey2) {
             stream >> hashOfHaghOfVariantSet[*itKey1][*itKey2];
         }
@@ -755,7 +833,11 @@ QDataStream & operator >> (
         QHash<QString, QHash<QDate, QHash<QString, QVariant>>> &hashOfHashOfHashStringVariant)
 {
     QStringList keys1;
-    stream >> keys1;
+    // stream >> keys1;
+    QVariant varKeys1;
+    stream >> varKeys1;
+    keys1 = varKeys1.toStringList();
+
     for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1) {
         QList<QDate> keys2;
         stream >> keys2;
@@ -789,7 +871,11 @@ QDataStream & operator >> (
         QHash<QString, QMap<QDate, QHash<QString, QVariant>>> &hashOfHashOfHashStringVariant)
 {
     QStringList keys1;
-    stream >> keys1;
+    // stream >> keys1;
+    QVariant varKeys1;
+    stream >> varKeys1;
+    keys1 = varKeys1.toStringList();
+
     for (auto itKey1 = keys1.begin(); itKey1 != keys1.end(); ++itKey1) {
         QList<QDate> keys2;
         stream >> keys2;
