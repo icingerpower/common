@@ -301,10 +301,7 @@ QDataStream & operator << (QDataStream &stream, const QMap<QString, bool> &mapOf
 QDataStream & operator >> (QDataStream &stream, QMap<QString, bool> &mapOfStringBool)
 {
     QStringList keys;
-    // stream >> keys;
-    QVariant varKeys;
-    stream >> varKeys;
-    keys = varKeys.toStringList();
+    stream >> keys;
 
     for (auto itKey = keys.begin();
          itKey != keys.end(); ++itKey) {
