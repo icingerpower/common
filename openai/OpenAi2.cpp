@@ -770,13 +770,27 @@ void OpenAi2::_callResponses(const QString &model,
     // This ensures both Real and Fake transports (used in tests) respect the scheduler/throttling.
     _schedule([this, model, prompt, imagePaths, wrappedOk, wrappedErr](std::function<void()> done) {
         
-        // Wrap callbacks to trigger 'done' when finished
+        // Wrap callbacks to trigger 'done' when finished.
+        // IMPORTANT: done() must always be called to decrement m_inFlightText.
+        // If wrappedOk/wrappedErr throw (e.g. from a misbehaving onLastError callback),
+        // done() would be skipped and m_inFlightText would leak, eventually blocking
+        // all new requests. The try/finally pattern here prevents that.
         auto doneOk = [wrappedOk, done](QString raw) {
-            wrappedOk(raw);
-            done(); 
+            try {
+                wrappedOk(raw);
+            } catch (...) {
+                done();
+                throw;
+            }
+            done();
         };
         auto doneErr = [wrappedErr, done](TransportError e) {
-            wrappedErr(e);
+            try {
+                wrappedErr(e);
+            } catch (...) {
+                done();
+                throw;
+            }
             done();
         };
 
