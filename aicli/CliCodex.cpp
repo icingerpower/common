@@ -11,7 +11,7 @@ QString CliCodex::getDescription() const
 }
 
 bool CliCodex::canGenSvg() const { return true; }
-bool CliCodex::canGenImages() const { return false; }
+bool CliCodex::canGenImages() const { return true; }
 bool CliCodex::canGenVideosFromText() const { return false; }
 bool CliCodex::canGenVideoFromImages() const { return false; }
 

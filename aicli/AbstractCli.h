@@ -103,6 +103,12 @@ public:
                         QObject *context,
                         std::function<void(CliRunResult)> callback) const;
 
+    // Overload that forwards a working directory to the CLI process.
+    void runPromptAsync(const QString &prompt,
+                        const QString &workingDir,
+                        QObject *context,
+                        std::function<void(CliRunResult)> callback) const;
+
     // Same as above for the availability check.
     void checkAvailabilityAsync(QObject *context,
                                 std::function<void(CliAvailability)> callback) const;

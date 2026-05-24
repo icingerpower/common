@@ -1,3 +1,6 @@
+// GCC 13 codegen bug: coroutines with non-trivially-destructible frame locals
+// (QPointer, std::function, CliAvailability, QProcess) miscompile at -O2/-O3.
+#pragma GCC optimize("O1")
 #include "AbstractCli.h"
 
 #include <QElapsedTimer>
@@ -118,10 +121,11 @@ QCoro::Task<CliAvailability> AbstractCli::checkAvailability() const
 
 static QCoro::Task<void> doRunPromptAsync(const AbstractCli *cli,
                                            QString prompt,
+                                           QString workingDir,
                                            QPointer<QObject> guard,
                                            std::function<void(CliRunResult)> callback)
 {
-    CliRunResult result = co_await cli->runPrompt(prompt);
+    CliRunResult result = co_await cli->runPrompt(prompt, workingDir);
     if (guard) {
         callback(std::move(result));
     }
@@ -141,7 +145,15 @@ void AbstractCli::runPromptAsync(const QString &prompt,
                                   QObject *context,
                                   std::function<void(CliRunResult)> callback) const
 {
-    doRunPromptAsync(this, prompt, QPointer<QObject>(context), std::move(callback));
+    doRunPromptAsync(this, prompt, {}, QPointer<QObject>(context), std::move(callback));
+}
+
+void AbstractCli::runPromptAsync(const QString &prompt,
+                                  const QString &workingDir,
+                                  QObject *context,
+                                  std::function<void(CliRunResult)> callback) const
+{
+    doRunPromptAsync(this, prompt, workingDir, QPointer<QObject>(context), std::move(callback));
 }
 
 void AbstractCli::checkAvailabilityAsync(QObject *context,
