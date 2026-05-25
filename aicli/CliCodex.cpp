@@ -20,6 +20,17 @@ QString CliCodex::getExecutable() const
     return QStringLiteral("codex");
 }
 
-// TODO: verify prompt invocation for the Codex CLI and override promptArgs().
+QStringList CliCodex::promptArgs() const
+{
+    // codex requires the `exec` subcommand for non-interactive use.
+    // `-` tells it to read the prompt from stdin (same pipe as Claude's `-p -`).
+    // --dangerously-bypass-approvals-and-sandbox grants full file-system access
+    // so Codex can create image files and other outputs in the working directory.
+    return {
+        QStringLiteral("exec"),
+        QStringLiteral("--dangerously-bypass-approvals-and-sandbox"),
+        QStringLiteral("-"),
+    };
+}
 
 DECLARE_CLI(CliCodex)
