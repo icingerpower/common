@@ -21,6 +21,18 @@ QString CliGemini::getExecutable() const
     return QStringLiteral("gemini");
 }
 
-// TODO: verify prompt invocation for the Gemini CLI and override promptArgs().
+QStringList CliGemini::promptArgs() const
+{
+    // -p "" triggers non-interactive (headless) mode; stdin content is used as the prompt.
+    // --skip-trust bypasses the trusted-directory check (needed for temp dirs).
+    // -y auto-approves all tool use so the process never blocks on a confirmation.
+    // --output-format text gives plain stdout with no wrapping JSON to strip.
+    return {
+        QStringLiteral("-p"), QStringLiteral(""),
+        QStringLiteral("--skip-trust"),
+        QStringLiteral("-y"),
+        QStringLiteral("--output-format"), QStringLiteral("text"),
+    };
+}
 
 DECLARE_CLI(CliGemini)

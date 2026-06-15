@@ -23,6 +23,16 @@ QStringList AbstractCli::promptArgs() const
     return {QStringLiteral("-p"), QStringLiteral("-")};
 }
 
+QStringList AbstractCli::translationPromptArgs() const
+{
+    return promptArgs();
+}
+
+QString AbstractCli::extractTextFromOutput(const QByteArray &rawOutput) const
+{
+    return QString::fromUtf8(rawOutput).trimmed();
+}
+
 QStringList AbstractCli::availabilityArgs() const
 {
     return {QStringLiteral("--version")};

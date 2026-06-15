@@ -13,6 +13,7 @@ public:
     bool canGenVideosFromText() const override;
     bool canGenVideoFromImages() const override;
     QString getExecutable() const override;
+    QStringList promptArgs() const override;
 };
 
 #endif // CLIGEMINI_H

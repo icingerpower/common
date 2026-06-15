@@ -14,6 +14,8 @@ public:
     bool canGenVideoFromImages() const override;
     QString getExecutable() const override;
     QStringList promptArgs() const override;
+    QStringList translationPromptArgs() const override;
+    QString extractTextFromOutput(const QByteArray &rawOutput) const override;
     QString parseMembership(const QString &versionOutput) const override;
 };
 

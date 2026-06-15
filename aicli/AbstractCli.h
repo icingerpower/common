@@ -66,10 +66,20 @@ public:
     // Executable name looked up in PATH (e.g. "claude", "gemini").
     virtual QString getExecutable() const = 0;
 
-    // Arguments passed when running a prompt. The prompt text is always
-    // written to a temporary file and fed via setStandardInputFile().
+    // Arguments passed when running a prompt via AbstractCli::runPrompt[Async].
+    // The prompt text is written to a temp file and fed via setStandardInputFile().
     // Default: {"-p", "-"}
     virtual QStringList promptArgs() const;
+
+    // Arguments used by PageTranslator when launching a translation process.
+    // May differ from promptArgs() when the CLI needs special flags (e.g. streaming
+    // JSON output format for Claude).  Default: same as promptArgs().
+    virtual QStringList translationPromptArgs() const;
+
+    // Extract the final translated text from raw process stdout.
+    // Default: return the output trimmed (plain-text CLIs).
+    // Claude override: parse stream-json event stream.
+    virtual QString extractTextFromOutput(const QByteArray &rawOutput) const;
 
     // Arguments used to verify the CLI is installed and optionally retrieve
     // version/account information. Default: {"--version"}
