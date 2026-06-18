@@ -1,9 +1,9 @@
-#ifndef CLIGEMINI_H
-#define CLIGEMINI_H
+#ifndef CLIANTIGRAVITY_H
+#define CLIANTIGRAVITY_H
 
 #include "AbstractCli.h"
 
-class CliGemini : public AbstractCli
+class CliAntigravity : public AbstractCli
 {
 public:
     QString getName() const override;
@@ -16,4 +16,4 @@ public:
     QStringList promptArgs() const override;
 };
 
-#endif // CLIGEMINI_H
+#endif // CLIANTIGRAVITY_H
