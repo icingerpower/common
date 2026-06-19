@@ -17,17 +17,19 @@ bool CliAntigravity::canGenVideoFromImages() const { return false; }
 
 QString CliAntigravity::getExecutable() const
 {
-    return QStringLiteral("antigravity");
+    return QStringLiteral("agy");
 }
 
 QStringList CliAntigravity::promptArgs() const
 {
-    // 'chat' subcommand with ask mode: non-agentic, no tool use, plain response.
+    // --print runs a single prompt non-interactively and prints the response.
     // '-' reads the prompt from stdin (fed via setStandardInputFile).
+    // --dangerously-skip-permissions auto-approves tool requests so the process
+    // never blocks on a confirmation prompt.
     return {
-        QStringLiteral("chat"),
-        QStringLiteral("--mode"), QStringLiteral("ask"),
+        QStringLiteral("--print"),
         QStringLiteral("-"),
+        QStringLiteral("--dangerously-skip-permissions"),
     };
 }
 
