@@ -33,6 +33,11 @@ QString AbstractCli::extractTextFromOutput(const QByteArray &rawOutput) const
     return QString::fromUtf8(rawOutput).trimmed();
 }
 
+QString AbstractCli::preparePrompt(const QString &prompt) const
+{
+    return prompt;
+}
+
 QStringList AbstractCli::availabilityArgs() const
 {
     return {QStringLiteral("--version")};
@@ -129,7 +134,7 @@ QCoro::Task<CliRunResult> AbstractCli::runPrompt(const QString &prompt,
     if (!promptFile.open(QIODevice::WriteOnly)) {
         co_return res;
     }
-    promptFile.write(prompt.toUtf8());
+    promptFile.write(preparePrompt(prompt).toUtf8());
     promptFile.close();
 
     QElapsedTimer timer;
@@ -238,7 +243,7 @@ void AbstractCli::runPromptAsync(const QString &prompt,
     QFile promptFile(promptPath);
     if (!promptFile.open(QIODevice::WriteOnly))
         return;
-    promptFile.write(prompt.toUtf8());
+    promptFile.write(preparePrompt(prompt).toUtf8());
     promptFile.close();
 
     const QString processWorkDir =

@@ -14,6 +14,7 @@ public:
     bool canGenVideoFromImages() const override;
     QString getExecutable() const override;
     QStringList promptArgs() const override;
+    QString preparePrompt(const QString &prompt) const override;
 };
 
 #endif // CLIANTIGRAVITY_H

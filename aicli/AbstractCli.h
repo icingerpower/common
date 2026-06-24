@@ -89,6 +89,12 @@ public:
     // Default implementation returns an empty string.
     virtual QString parseMembership(const QString &versionOutput) const;
 
+    // Optionally transform the prompt before it is written to the temp file and
+    // fed to the CLI process.  Default: return the prompt unchanged.
+    // Override to inject CLI-specific preambles (e.g. force Antigravity to call
+    // generate_image immediately instead of exploring the filesystem first).
+    virtual QString preparePrompt(const QString &prompt) const;
+
     // -------------------------------------------------------------------------
     // Coroutine-based API (co_await friendly)
     // -------------------------------------------------------------------------
