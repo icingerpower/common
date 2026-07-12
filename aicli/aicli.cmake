@@ -14,6 +14,10 @@ set(AICLI_FILES
     ${CMAKE_CURRENT_LIST_DIR}/CliClaude.cpp
     ${CMAKE_CURRENT_LIST_DIR}/CliAntigravity.h
     ${CMAKE_CURRENT_LIST_DIR}/CliAntigravity.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/CliAntigravityGpt.h
+    ${CMAKE_CURRENT_LIST_DIR}/CliAntigravityGpt.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/CliAntigravityClaude.h
+    ${CMAKE_CURRENT_LIST_DIR}/CliAntigravityClaude.cpp
     ${CMAKE_CURRENT_LIST_DIR}/CliCodex.h
     ${CMAKE_CURRENT_LIST_DIR}/CliCodex.cpp
     ${CMAKE_CURRENT_LIST_DIR}/CliDeepseek.h
