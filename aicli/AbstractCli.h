@@ -9,6 +9,8 @@
 
 #include <QCoro/QCoroTask>
 
+class QProcess;
+
 // Result of a prompt run through a CLI.
 struct CliRunResult {
     QString output;           // Full stdout from the CLI process.
@@ -67,9 +69,35 @@ public:
     virtual QString getExecutable() const = 0;
 
     // Arguments passed when running a prompt via AbstractCli::runPrompt[Async].
-    // The prompt text is written to a temp file and fed via setStandardInputFile().
-    // Default: {"-p", "-"}
+    // The '-' entry is a placeholder: for stdin-based CLIs it is passed through
+    // verbatim ("read prompt from stdin"); for argv-based CLIs (see
+    // promptViaStdin()) configurePromptProcess() replaces it with the prompt
+    // text itself.  Default: {"-p", "-"}
     virtual QStringList promptArgs() const;
+
+    // Whether the CLI reads the prompt from stdin when given the '-' placeholder
+    // (Claude Code convention).  Default: true.
+    // Override to return false for CLIs whose prompt flag consumes the prompt
+    // text as its argument value and that ignore stdin entirely.  Antigravity's
+    // `agy` is one: `--print` is a Go string flag, so `--print -` makes the model
+    // answer the literal prompt "-" ("your request was blank") while the real
+    // prompt fed via setStandardInputFile() is never read.
+    virtual bool promptViaStdin() const;
+
+    // Configure how `process` receives the prompt.  `baseArgs` is the argv
+    // template (promptArgs() or translationPromptArgs()), `prompt` is the exact
+    // text that was written to `promptPath`.
+    //   - stdin CLIs: arguments set unchanged, promptPath fed via
+    //     setStandardInputFile().
+    //   - argv CLIs (promptViaStdin() == false): the '-' placeholder is replaced
+    //     by the prompt text and stdin is bound to the null device.
+    // Caveat for argv CLIs: Linux caps one argv entry at 128 KB (MAX_ARG_STRLEN);
+    // a larger prompt makes the process fail to start.  There is no workaround
+    // for CLIs without stdin support — callers see FailedToStart.
+    void configurePromptProcess(QProcess *process,
+                                const QStringList &baseArgs,
+                                const QString &prompt,
+                                const QString &promptPath) const;
 
     // Arguments used by PageTranslator when launching a translation process.
     // May differ from promptArgs() when the CLI needs special flags (e.g. streaming

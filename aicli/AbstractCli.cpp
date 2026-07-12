@@ -28,6 +28,38 @@ QStringList AbstractCli::translationPromptArgs() const
     return promptArgs();
 }
 
+bool AbstractCli::promptViaStdin() const
+{
+    return true;
+}
+
+void AbstractCli::configurePromptProcess(QProcess *process,
+                                         const QStringList &baseArgs,
+                                         const QString &prompt,
+                                         const QString &promptPath) const
+{
+    if (promptViaStdin()) {
+        process->setArguments(baseArgs);
+        process->setStandardInputFile(promptPath);
+        return;
+    }
+
+    // argv-based CLI (e.g. Antigravity): the prompt text replaces the '-'
+    // placeholder.  Keep the placeholder position so value-taking flags such
+    // as `--print <prompt>` stay correctly paired.
+    QStringList arguments = baseArgs;
+    const int placeholder = arguments.indexOf(QStringLiteral("-"));
+    if (placeholder >= 0) {
+        arguments[placeholder] = prompt;
+    } else {
+        arguments.append(prompt);
+    }
+    process->setArguments(arguments);
+    // Bind stdin to the null device so a CLI that unexpectedly polls stdin
+    // can never block waiting for input.
+    process->setStandardInputFile(QProcess::nullDevice());
+}
+
 QString AbstractCli::extractTextFromOutput(const QByteArray &rawOutput) const
 {
     return QString::fromUtf8(rawOutput).trimmed();
@@ -129,12 +161,13 @@ QCoro::Task<CliRunResult> AbstractCli::runPrompt(const QString &prompt,
 
     // Write prompt to a file to avoid per-argument size limits on Linux
     // (MAX_ARG_STRLEN = 128 KB) and to keep argv clean.
+    const QString prepared = preparePrompt(prompt);
     const QString promptPath = tempDir.path() + QStringLiteral("/prompt.txt");
     QFile promptFile(promptPath);
     if (!promptFile.open(QIODevice::WriteOnly)) {
         co_return res;
     }
-    promptFile.write(preparePrompt(prompt).toUtf8());
+    promptFile.write(prepared.toUtf8());
     promptFile.close();
 
     QElapsedTimer timer;
@@ -148,8 +181,7 @@ QCoro::Task<CliRunResult> AbstractCli::runPrompt(const QString &prompt,
     QProcess process;
     process.setWorkingDirectory(processWorkDir);
     applyResolvedProgram(&process, resolveExecutable(getExecutable()));
-    process.setArguments(promptArgs());
-    process.setStandardInputFile(promptPath);
+    configurePromptProcess(&process, promptArgs(), prepared, promptPath);
 
     co_await qCoro(process).start();
     co_await qCoro(process).waitForFinished(-1); // no timeout: prompts can be slow
@@ -239,11 +271,12 @@ void AbstractCli::runPromptAsync(const QString &prompt,
     if (!ctx->tempDir.isValid())
         return;
 
+    const QString prepared = preparePrompt(prompt);
     const QString promptPath = ctx->tempDir.path() + QStringLiteral("/prompt.txt");
     QFile promptFile(promptPath);
     if (!promptFile.open(QIODevice::WriteOnly))
         return;
-    promptFile.write(preparePrompt(prompt).toUtf8());
+    promptFile.write(prepared.toUtf8());
     promptFile.close();
 
     const QString processWorkDir =
@@ -256,8 +289,7 @@ void AbstractCli::runPromptAsync(const QString &prompt,
     auto *process = new QProcess();
     process->setWorkingDirectory(processWorkDir);
     applyResolvedProgram(process, resolveExecutable(getExecutable()));
-    process->setArguments(promptArgs());
-    process->setStandardInputFile(promptPath);
+    configurePromptProcess(process, promptArgs(), prepared, promptPath);
 
     QObject::connect(process, &QProcess::finished,
                      process, [process, ctx](int exitCode, QProcess::ExitStatus) mutable {

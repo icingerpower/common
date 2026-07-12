@@ -23,7 +23,10 @@ QString CliAntigravity::getExecutable() const
 QStringList CliAntigravity::promptArgs() const
 {
     // --print runs a single prompt non-interactively and prints the response.
-    // '-' reads the prompt from stdin (fed via setStandardInputFile).
+    // It is a Go string flag: its VALUE is the prompt text.  agy has no stdin
+    // prompt mode, so the '-' below is only the placeholder that
+    // configurePromptProcess() replaces with the prompt text (promptViaStdin()
+    // returns false).
     // --dangerously-skip-permissions auto-approves tool requests so the process
     // never blocks on a confirmation prompt.
     // --print-timeout 20m: the default 5 min is too short when the model needs
@@ -37,16 +40,31 @@ QStringList CliAntigravity::promptArgs() const
     };
 }
 
+bool CliAntigravity::promptViaStdin() const
+{
+    return false;
+}
+
 QString CliAntigravity::preparePrompt(const QString &prompt) const
 {
     // Antigravity is an agentic CLI that explores the filesystem before acting.
-    // Without an explicit directive it spends its entire --print-timeout browsing
-    // files and running find/Python commands instead of generating the image.
-    // Prepend a hard instruction so it calls generate_image immediately.
+    // Branch on prompt type so it never receives the wrong instruction.
+    //
+    // Image/SVG prompts always contain "Image filename" (from buildSvgPrompt).
+    // All other prompts are text (article generation, update, translation) and
+    // only need a "start immediately" guard — not a generate_image directive.
+    if (prompt.contains(QStringLiteral("Image filename"))) {
+        return QStringLiteral(
+            "IMPORTANT: Use your generate_image tool IMMEDIATELY to create the image described below. "
+            "Do NOT list files, view existing images, run shell commands, or search for scripts first. "
+            "Generate the image now, save it to the file path specified in the instructions, then stop.\n\n")
+            + prompt;
+    }
+    // Text prompt — prevent agentic filesystem exploration, output immediately.
     return QStringLiteral(
-        "IMPORTANT: Use your generate_image tool IMMEDIATELY to create the image described below. "
-        "Do NOT list files, view existing images, run shell commands, or search for scripts first. "
-        "Generate the image now, save it to the file path specified in the instructions, then stop.\n\n")
+        "IMPORTANT: Output your response as plain text IMMEDIATELY. "
+        "Do NOT use any tools, list files, run shell commands, or explore the filesystem. "
+        "Start your response now.\n\n")
         + prompt;
 }
 

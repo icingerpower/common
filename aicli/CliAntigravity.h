@@ -14,6 +14,10 @@ public:
     bool canGenVideoFromImages() const override;
     QString getExecutable() const override;
     QStringList promptArgs() const override;
+    // false: agy has no stdin prompt mode — `--print` takes the prompt text as
+    // its flag value.  `--print -` would make the model answer the literal
+    // prompt "-" while stdin is silently ignored.
+    bool promptViaStdin() const override;
     QString preparePrompt(const QString &prompt) const override;
 };
 
