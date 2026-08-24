@@ -68,4 +68,20 @@ QString CliAntigravity::preparePrompt(const QString &prompt) const
         + prompt;
 }
 
+CliErrorKind CliAntigravity::classifyError(const QString &errorOutput) const
+{
+    // Exact strings observed live: "Authentication required. Please visit the
+    // URL to log in:", "Individual quota reached. Please upgrade your
+    // subscription...", "Eligibility check failed: RESOURCE_EXHAUSTED (code
+    // 429): ...".
+    if (errorOutput.contains(QStringLiteral("Authentication required"), Qt::CaseInsensitive)) {
+        return CliErrorKind::AuthRequired;
+    }
+    if (errorOutput.contains(QStringLiteral("quota"), Qt::CaseInsensitive)
+            || errorOutput.contains(QStringLiteral("RESOURCE_EXHAUSTED"))) {
+        return CliErrorKind::QuotaExceeded;
+    }
+    return CliErrorKind::Other;
+}
+
 DECLARE_CLI(CliAntigravity)

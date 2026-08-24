@@ -70,6 +70,11 @@ QString AbstractCli::preparePrompt(const QString &prompt) const
     return prompt;
 }
 
+CliErrorKind AbstractCli::classifyError(const QString &/*errorOutput*/) const
+{
+    return CliErrorKind::Other;
+}
+
 QStringList AbstractCli::availabilityArgs() const
 {
     return {QStringLiteral("--version")};

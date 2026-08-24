@@ -27,6 +27,16 @@ struct CliAvailability {
     QString versionOutput;      // Raw stdout from the availability check command.
 };
 
+// Coarse classification of a failed CLI invocation, derived from its stderr
+// text. Lets callers react to recoverable, human-fixable conditions (rate
+// limits, expired login) differently from an ordinary failure, without the
+// caller having to know each CLI's specific error strings.
+enum class CliErrorKind {
+    Other,          // no special classification — treat as an ordinary failure.
+    QuotaExceeded,  // rate limit / subscription quota hit; typically resets shortly.
+    AuthRequired,   // login session expired; needs a human to re-authenticate.
+};
+
 // Base class for AI command-line tools (Claude, Gemini, Codex, …).
 //
 // Subclasses register themselves at startup via DECLARE_CLI() and are
@@ -122,6 +132,13 @@ public:
     // Override to inject CLI-specific preambles (e.g. force Antigravity to call
     // generate_image immediately instead of exploring the filesystem first).
     virtual QString preparePrompt(const QString &prompt) const;
+
+    // Classify a failed process's stderr text (see CliErrorKind). Default:
+    // always Other — this CLI has no known recoverable-error strings.
+    // Override for CLIs with distinctive quota/auth error text so callers can
+    // offer a "fix it and retry" path instead of treating every failure the
+    // same way.
+    virtual CliErrorKind classifyError(const QString &errorOutput) const;
 
     // -------------------------------------------------------------------------
     // Coroutine-based API (co_await friendly)
