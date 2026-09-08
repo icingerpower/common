@@ -33,4 +33,25 @@ QStringList CliCodex::promptArgs() const
     };
 }
 
+CliErrorKind CliCodex::classifyError(const QString &errorOutput) const
+{
+    // Exact strings observed live (codex_login::auth::manager): "Failed to
+    // refresh token: 401 Unauthorized: ... refresh_token_expired ... Please
+    // log out and sign in again." — the CLI manages its own OAuth session
+    // and needs a human to run `codex login` again.
+    if (errorOutput.contains(QStringLiteral("refresh_token_expired"))
+        || errorOutput.contains(QStringLiteral("Please try signing in again"))
+        || errorOutput.contains(QStringLiteral("log out and sign in"), Qt::CaseInsensitive))
+    {
+        return CliErrorKind::AuthRequired;
+    }
+    if (errorOutput.contains(QStringLiteral("rate limit"), Qt::CaseInsensitive)
+        || errorOutput.contains(QStringLiteral("usage limit"), Qt::CaseInsensitive)
+        || errorOutput.contains(QStringLiteral("429")))
+    {
+        return CliErrorKind::QuotaExceeded;
+    }
+    return CliErrorKind::Other;
+}
+
 DECLARE_CLI(CliCodex)

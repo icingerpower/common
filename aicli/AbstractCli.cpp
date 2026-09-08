@@ -70,6 +70,11 @@ QString AbstractCli::preparePrompt(const QString &prompt) const
     return prompt;
 }
 
+QStringList AbstractCli::outputFallbackDirs() const
+{
+    return {};
+}
+
 CliErrorKind AbstractCli::classifyError(const QString &/*errorOutput*/) const
 {
     return CliErrorKind::Other;

@@ -37,6 +37,15 @@ enum class CliErrorKind {
     AuthRequired,   // login session expired; needs a human to re-authenticate.
 };
 
+// Marker line that a raster-image generation prompt (built by
+// GenPageQueue::buildRasterImagePrompt()) includes so CLI-specific
+// preparePrompt() overrides can detect "this prompt wants a real image file
+// written to disk" without colliding with the SVG prompt, which also mentions
+// an "Image filename" but must never trigger a file-write directive (it
+// explicitly requires text-only output). Keep this literal in sync between
+// the prompt builder and every preparePrompt() override that checks for it.
+static constexpr const char *RASTER_IMAGE_PROMPT_MARKER = "Task type         : RASTER_IMAGE_GENERATION";
+
 // Base class for AI command-line tools (Claude, Gemini, Codex, …).
 //
 // Subclasses register themselves at startup via DECLARE_CLI() and are
@@ -139,6 +148,20 @@ public:
     // offer a "fix it and retry" path instead of treating every failure the
     // same way.
     virtual CliErrorKind classifyError(const QString &errorOutput) const;
+
+    // Extra directories where a file-writing tool call for this CLI can land
+    // instead of workingDir, when the CLI's own idea of "current directory"
+    // does not track the process's actual one. Default: none (assume the
+    // CLI's file tools honor workingDir). Override for CLIs known to fall
+    // back to a fixed internal location — see CliAntigravity, whose
+    // generate_image/file tools were observed writing into a persistent
+    // `~/.gemini/antigravity-cli/scratch/` directory regardless of the
+    // process's working directory, most likely because the file tool
+    // resolves against its own "project"/session concept rather than the
+    // literal OS cwd. Callers that expect a specific output file should
+    // check these directories too before concluding the CLI produced
+    // nothing.
+    virtual QStringList outputFallbackDirs() const;
 
     // -------------------------------------------------------------------------
     // Coroutine-based API (co_await friendly)

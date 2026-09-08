@@ -1,5 +1,7 @@
 #include "CliAntigravity.h"
 
+#include <QDir>
+
 QString CliAntigravity::getName() const
 {
     return QStringLiteral("Antigravity");
@@ -50,10 +52,14 @@ QString CliAntigravity::preparePrompt(const QString &prompt) const
     // Antigravity is an agentic CLI that explores the filesystem before acting.
     // Branch on prompt type so it never receives the wrong instruction.
     //
-    // Image/SVG prompts always contain "Image filename" (from buildSvgPrompt).
-    // All other prompts are text (article generation, update, translation) and
-    // only need a "start immediately" guard — not a generate_image directive.
-    if (prompt.contains(QStringLiteral("Image filename"))) {
+    // Only a raster-image prompt (GenPageQueue::buildRasterImagePrompt(), tagged
+    // with RASTER_IMAGE_PROMPT_MARKER) wants the generate_image directive. The
+    // SVG prompt (buildSvgPrompt()) also mentions an "Image filename" but
+    // explicitly requires text-only output ("Do NOT use any Write, Edit, or
+    // file-creation tools") — matching on that substring here used to inject a
+    // contradictory "use generate_image and write a file" preamble into every
+    // SVG call. The marker is a distinct sentinel only the raster prompt emits.
+    if (prompt.contains(QString::fromLatin1(RASTER_IMAGE_PROMPT_MARKER))) {
         return QStringLiteral(
             "IMPORTANT: Use your generate_image tool IMMEDIATELY to create the image described below. "
             "Do NOT list files, view existing images, run shell commands, or search for scripts first. "
@@ -82,6 +88,21 @@ CliErrorKind CliAntigravity::classifyError(const QString &errorOutput) const
         return CliErrorKind::QuotaExceeded;
     }
     return CliErrorKind::Other;
+}
+
+QStringList CliAntigravity::outputFallbackDirs() const
+{
+    // Confirmed live: a file-write tool call (plain text file AND
+    // generate_image) can silently land here instead of the process's
+    // actual working directory — reproduced with a bare "write marker.txt
+    // in the current working directory" prompt from a brand-new empty
+    // directory, and the real app's slideshow generation, both ending up
+    // in this exact folder instead. Root cause looks like agy resolving
+    // file paths against its own persistent "project"/session concept
+    // rather than the OS cwd of the launched process; --new-project /
+    // --project flags might avoid it, but checking here works regardless
+    // of that and needs no extra invocation-order guarantees.
+    return {QDir::homePath() + QStringLiteral("/.gemini/antigravity-cli/scratch")};
 }
 
 DECLARE_CLI(CliAntigravity)

@@ -14,6 +14,7 @@ public:
     bool canGenVideoFromImages() const override;
     QString getExecutable() const override;
     QStringList promptArgs() const override;
+    CliErrorKind classifyError(const QString &errorOutput) const override;
 };
 
 #endif // CLICODEX_H
