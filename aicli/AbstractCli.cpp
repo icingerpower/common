@@ -3,6 +3,8 @@
 #pragma GCC optimize("O1")
 #include "AbstractCli.h"
 
+#include <chrono>
+
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -12,7 +14,7 @@
 #include <QTemporaryDir>
 #include <QTimer>
 
-#include <QCoro/QCoroProcess>
+#include <QCoro/QCoroTimer>
 
 // ---------------------------------------------------------------------------
 // Default virtuals
@@ -193,8 +195,15 @@ QCoro::Task<CliRunResult> AbstractCli::runPrompt(const QString &prompt,
     applyResolvedProgram(&process, resolveExecutable(getExecutable()));
     configurePromptProcess(&process, promptArgs(), prepared, promptPath);
 
-    co_await qCoro(process).start();
-    co_await qCoro(process).waitForFinished(-1); // no timeout: prompts can be slow
+    process.start();
+    if (process.waitForStarted(30'000)) {
+        // QCoroProcess resumes the coroutine from QProcess::finished. The
+        // local process can then be destroyed while its signal is still being
+        // delivered. Wait via timer ticks so the event loop stays responsive
+        // and the process outlives its own finished callback.
+        while (process.state() != QProcess::NotRunning)
+            co_await QCoro::sleepFor(std::chrono::milliseconds(100));
+    }
 
     res.durationMs     = timer.elapsed();
     res.exitCode       = process.exitCode();
@@ -213,10 +222,21 @@ QCoro::Task<CliAvailability> AbstractCli::checkAvailability() const
     process.setProgram(getExecutable());
     process.setArguments(availabilityArgs());
 
-    co_await qCoro(process).start();
+    process.start();
+    if (!process.waitForStarted(30'000)) {
+        co_return avail;
+    }
     // 5 s timeout: version checks should be instant; guard against CLIs that
     // launch an interactive REPL and never exit on their own.
-    co_await qCoro(process).waitForFinished(5000);
+    QElapsedTimer timeout;
+    timeout.start();
+    while (process.state() != QProcess::NotRunning && timeout.elapsed() < 5000)
+        co_await QCoro::sleepFor(std::chrono::milliseconds(100));
+    if (process.state() != QProcess::NotRunning) {
+        process.kill();
+        process.waitForFinished(2000);
+        co_return avail;
+    }
 
     if (process.error() == QProcess::FailedToStart) {
         co_return avail; // not installed
