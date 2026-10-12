@@ -12,6 +12,9 @@ public:
     bool canGenImages() const override;
     bool canGenVideosFromText() const override;
     bool canGenVideoFromImages() const override;
+    // The one CLI with a live web-search measurement (a 31-day daily-close
+    // lookup answered in 1 m 52 s as one flat JSON object).
+    bool canWebSearch() const override;
     QString getExecutable() const override;
     QStringList promptArgs() const override;
     // false: agy has no stdin prompt mode — `--print` takes the prompt text as

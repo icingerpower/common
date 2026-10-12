@@ -35,6 +35,15 @@ enum class CliErrorKind {
     Other,          // no special classification — treat as an ordinary failure.
     QuotaExceeded,  // rate limit / subscription quota hit; typically resets shortly.
     AuthRequired,   // login session expired; needs a human to re-authenticate.
+    // ⚠️ THE ONLY KIND THAT IS WORTH SIMPLY TRYING AGAIN, and that is the whole
+    // reason it exists as its own value. The machine could not reach the
+    // service: DNS did not resolve, the connection was refused/reset, the route
+    // is gone, the proxy or the TLS handshake failed, or the gateway answered
+    // 502/503/504. Nothing on this machine or in the account needs fixing, so a
+    // caller may retry after a wait — unlike AuthRequired (a human must log in)
+    // and QuotaExceeded (a budget must refill or another CLI must be picked),
+    // where more attempts cost time and API calls for nothing.
+    NetworkError,
 };
 
 // Marker line that a raster-image generation prompt (built by
@@ -45,6 +54,27 @@ enum class CliErrorKind {
 // explicitly requires text-only output). Keep this literal in sync between
 // the prompt builder and every preparePrompt() override that checks for it.
 static constexpr const char *RASTER_IMAGE_PROMPT_MARKER = "Task type         : RASTER_IMAGE_GENERATION";
+
+// Marker line that a WEB-SEARCH prompt includes so CLI-specific preparePrompt()
+// overrides can detect "this prompt REQUIRES the model's web-search tool" and
+// must therefore NOT receive an anti-tool preamble.
+//
+// ⚠️ THIS EXISTS BECAUSE THE OPPOSITE DEFAULT IS ALREADY IN PLACE AND WOULD
+// SILENTLY DEFEAT SUCH A PROMPT. CliAntigravity::preparePrompt() prepends
+// "Do NOT use any tools, list files, run shell commands, or explore the
+// filesystem" to EVERY plain-text prompt. Routed through that unchanged, a
+// web-search request arrives with an explicit instruction not to search — and
+// the likely outcome is not an error but a plausible INVENTED answer, i.e. a
+// failure that produces no error at all. Same sentinel shape, same reason, as
+// RASTER_IMAGE_PROMPT_MARKER above.
+//
+// Keep this literal in sync between the prompt builder and every
+// preparePrompt() override that checks for it.
+static constexpr const char *WEB_SEARCH_PROMPT_MARKER = "Task type         : WEB_SEARCH_LOOKUP";
+
+// Explicit opt-in for historical/public-data download tasks. Generic web
+// searches and text/image prompts retain their existing tool restrictions.
+static constexpr const char *PUBLIC_DATA_DOWNLOAD_PROMPT_MARKER = "Task capability   : PUBLIC_DATA_DOWNLOAD";
 
 // Base class for AI command-line tools (Claude, Gemini, Codex, …).
 //
@@ -80,12 +110,43 @@ public:
     // Whether this CLI can generate a video from one or more images.
     virtual bool canGenVideoFromImages() const = 0;
 
+    // Whether this CLI can perform a real WEB SEARCH while answering a prompt.
+    //
+    // ⚠️ DEFAULTED false, UNLIKE THE FOUR ABOVE (which are pure virtual), and
+    // that is deliberate. A pure virtual would break every subclass and every
+    // test fake at once, for a capability whose honest default is "we have not
+    // measured that it can" — and absence of a measurement must read as "no",
+    // never as "probably". Override it only for a CLI somebody actually ran a
+    // search prompt against.
+    virtual bool canWebSearch() const { return false; }
+
     // -------------------------------------------------------------------------
     // Process configuration
     // -------------------------------------------------------------------------
 
     // Executable name looked up in PATH (e.g. "claude", "gemini").
     virtual QString getExecutable() const = 0;
+
+    // -------------------------------------------------------------------------
+    // Installation probe (synchronous, no subprocess)
+    // -------------------------------------------------------------------------
+
+    // Full path getExecutable() resolves to for launching, or an EMPTY string
+    // when it is not installed anywhere the resolver looks (the process PATH
+    // plus the user-local package-manager directories runPrompt() and
+    // checkAvailability() already search).
+    //
+    // ⚠️ THIS IS THE SAME RESOLVER runPrompt[Async]() USES, on purpose: "may I
+    // offer this CLI?" and "which binary will I launch?" must be one answer, or
+    // a UI eventually offers something it cannot run. It is a FILESYSTEM lookup
+    // only — no process is started — so it is cheap and deterministic and can be
+    // called while building a widget. Use checkAvailability[Async]() instead when
+    // you also need version/membership info from the tool itself.
+    QString resolvedExecutablePath() const;
+
+    // Is this CLI installed on this machine at all? A control that offers a CLI
+    // whose executable is absent is offering a guaranteed failure.
+    bool isInstalled() const;
 
     // Arguments passed when running a prompt via AbstractCli::runPrompt[Async].
     // The '-' entry is a placeholder: for stdin-based CLIs it is passed through
@@ -142,11 +203,20 @@ public:
     // generate_image immediately instead of exploring the filesystem first).
     virtual QString preparePrompt(const QString &prompt) const;
 
-    // Classify a failed process's stderr text (see CliErrorKind). Default:
-    // always Other — this CLI has no known recoverable-error strings.
-    // Override for CLIs with distinctive quota/auth error text so callers can
-    // offer a "fix it and retry" path instead of treating every failure the
-    // same way.
+    // Classify a failed process's stderr text (see CliErrorKind).
+    //
+    // Default: recognises TRANSPORT-level failures, which are CLI-independent
+    // (every one of these tools is an HTTPS client, so "getaddrinfo ENOTFOUND",
+    // "connection reset", "socket hang up", "502 Bad Gateway" … mean the same
+    // thing whichever binary printed them) and returns NetworkError for them;
+    // anything else is Other. It deliberately does NOT guess at auth/quota
+    // wording, which IS vendor-specific — that stays a subclass's job.
+    //
+    // ⚠️ AN OVERRIDE SHOULD END BY CHAINING TO THIS BASE rather than returning
+    // Other, so a CLI that knows its own auth/quota strings still gets the
+    // shared transport classification (CliAntigravity does exactly that). An
+    // override that answers Other itself is not wrong, it just opts out of the
+    // "worth retrying" signal callers use.
     virtual CliErrorKind classifyError(const QString &errorOutput) const;
 
     // Extra directories where a file-writing tool call for this CLI can land
@@ -183,12 +253,14 @@ public:
     // Starts a prompt run asynchronously. Invokes callback(result) on the Qt
     // event-loop thread when the process finishes. The callback is NOT called
     // if context is destroyed before the process completes.
-    void runPromptAsync(const QString &prompt,
+    // Non-owning process handle; use QPointer when retaining it. The process
+    // deletes itself after completion. nullptr means local setup failed.
+    QProcess *runPromptAsync(const QString &prompt,
                         QObject *context,
                         std::function<void(CliRunResult)> callback) const;
 
     // Overload that forwards a working directory to the CLI process.
-    void runPromptAsync(const QString &prompt,
+    QProcess *runPromptAsync(const QString &prompt,
                         const QString &workingDir,
                         QObject *context,
                         std::function<void(CliRunResult)> callback) const;

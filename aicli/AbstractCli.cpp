@@ -77,8 +77,90 @@ QStringList AbstractCli::outputFallbackDirs() const
     return {};
 }
 
-CliErrorKind AbstractCli::classifyError(const QString &/*errorOutput*/) const
+// ---------------------------------------------------------------------------
+// TRANSPORT FAILURES, CLASSIFIED ONCE FOR EVERY CLI
+// ---------------------------------------------------------------------------
+//
+// Every CLI in this registry is an HTTPS client wrapped in a terminal command,
+// so the layer that breaks when there is no network prints the SAME family of
+// messages whichever binary is in front of it: libc resolver errors
+// ("Name or service not known", "Temporary failure in name resolution"), Node's
+// errno spellings ("ENOTFOUND", "ECONNRESET", "EAI_AGAIN", "socket hang up",
+// "fetch failed"), curl/Go phrasings ("connection refused", "no route to host")
+// and gateway statuses (502/503/504). Recognising them here rather than in each
+// subclass means a caller's "is this worth retrying?" question has ONE answer
+// for all of them, and a newly added CLI inherits it without writing anything.
+//
+// ⚠️ WHY THIS IS DELIBERATELY CONSERVATIVE. The cost of a FALSE NetworkError is
+// that a caller waits and retries something that will never work; the cost of a
+// missed one is that it gives up on an outage that would have cleared. So the
+// matched strings are transport words only — no bare "timeout" (a slow model
+// times out too, and re-running it costs another full timeout), no bare "error",
+// and auth/quota are NOT guessed at here because their wording is genuinely
+// vendor-specific and a subclass override owns it (and is checked first, since
+// an override runs before it chains down to this).
+CliErrorKind AbstractCli::classifyError(const QString &errorOutput) const
 {
+    if (errorOutput.isEmpty())
+        return CliErrorKind::Other;
+
+    static const char *const kNetworkNeedles[] = {
+        // libc / getaddrinfo
+        "getaddrinfo",
+        "name or service not known",
+        "temporary failure in name resolution",
+        "could not resolve host",
+        "could not resolve",
+        "nodename nor servname provided",
+        "dns lookup failed",
+        // errno spellings (Node, Go, Python clients)
+        "enotfound",
+        "eai_again",
+        "econnrefused",
+        "econnreset",
+        "ehostunreach",
+        "enetunreach",
+        "enetdown",
+        "epipe",
+        // prose forms of the same
+        "connection refused",
+        "connection reset",
+        "connection aborted",
+        "connection closed",
+        "network is unreachable",
+        "network unreachable",
+        "network error",
+        "no route to host",
+        "socket hang up",
+        "fetch failed",
+        "failed to connect",
+        "unable to connect",
+        "remote end closed connection",
+        "server disconnected",
+        "broken pipe",
+        // proxy / TLS transport
+        "proxy connect",
+        "proxyconnect",
+        "tls handshake",
+        "ssl handshake",
+        "handshake failure",
+        // gateways answering for a service that is momentarily unreachable
+        "502 bad gateway",
+        "bad gateway",
+        "503 service unavailable",
+        "service unavailable",
+        "504 gateway time-out",
+        "504 gateway timeout",
+        "gateway timeout",
+        "upstream connect error",
+        // the tools' own summaries
+        "you appear to be offline",
+        "offline",
+    };
+    for (const char *needle : kNetworkNeedles) {
+        if (errorOutput.contains(QLatin1String(needle), Qt::CaseInsensitive))
+            return CliErrorKind::NetworkError;
+    }
     return CliErrorKind::Other;
 }
 
@@ -96,14 +178,16 @@ QString AbstractCli::parseMembership(const QString &) const
 // Coroutine implementations
 // ---------------------------------------------------------------------------
 
-// Resolve an executable name to its full path.
+// Resolve an executable name to its full path, or an EMPTY string when it is
+// not installed anywhere this resolver looks.
+//
 // First checks the current process PATH (works when launched from a terminal).
 // If not found, scans common user-local package-manager paths so that
 // nvm/npm/yarn-installed tools are found even when the app is launched from a
 // desktop shortcut that inherits a minimal PATH.
 // NOTE: no subprocess is spawned here — using QProcess::waitForFinished() would
 // spin a nested Qt event loop and corrupt in-flight QCoro signal connections.
-static QString resolveExecutable(const QString &name)
+static QString resolveExecutableOrEmpty(const QString &name)
 {
     const QString direct = QStandardPaths::findExecutable(name);
     if (!direct.isEmpty())
@@ -136,7 +220,38 @@ static QString resolveExecutable(const QString &name)
             return candidate;
     }
 
-    return name; // fall back to bare name; QProcess will report FailedToStart
+    return {};
+}
+
+// Same lookup, but with the historical fallback for the LAUNCH path: a bare
+// name is still handed to QProcess, which reports FailedToStart. Kept so a
+// mis-detection can never turn a runnable CLI into a silent no-op.
+static QString resolveExecutable(const QString &name)
+{
+    const QString found = resolveExecutableOrEmpty(name);
+    return found.isEmpty() ? name : found;
+}
+
+// ---------------------------------------------------------------------------
+// Installation probe
+// ---------------------------------------------------------------------------
+//
+// ⚠️ THE SAME RESOLVER THAT LAUNCHES THE PROCESS ANSWERS "IS IT INSTALLED?".
+// Two separate lookups would eventually disagree, and the disagreement is
+// exactly the failure a caller uses this to avoid: a UI offering a CLI it
+// cannot launch. No subprocess is spawned, so this is cheap enough to call for
+// every registered CLI while building a widget, and deterministic — unlike
+// AvailableCliTable's `--version` probe, which is asynchronous and reports
+// membership too.
+
+QString AbstractCli::resolvedExecutablePath() const
+{
+    return resolveExecutableOrEmpty(getExecutable());
+}
+
+bool AbstractCli::isInstalled() const
+{
+    return !resolvedExecutablePath().isEmpty();
 }
 
 // Set the program on `process` and, when the resolved path lives outside the
@@ -219,7 +334,15 @@ QCoro::Task<CliAvailability> AbstractCli::checkAvailability() const
     CliAvailability avail;
 
     QProcess process;
-    process.setProgram(getExecutable());
+    // THE SAME RESOLVER EVERY OTHER ENTRY POINT USES. This line used to be a
+    // bare setProgram(getExecutable()), which only ever searched the process
+    // PATH — so when the app is launched from a desktop shortcut (minimal PATH,
+    // no ~/.local/bin, no nvm bin dir) this coroutine reported an INSTALLED CLI
+    // as unavailable, while checkAvailabilityAsync() and runPrompt[Async]() —
+    // all three going through applyResolvedProgram(resolveExecutable(...)) —
+    // found and ran it. Which API a caller happens to use must not change the
+    // answer to "is this CLI here?".
+    applyResolvedProgram(&process, resolveExecutable(getExecutable()));
     process.setArguments(availabilityArgs());
 
     process.start();
@@ -285,27 +408,27 @@ struct CheckCtx {
 
 } // namespace
 
-void AbstractCli::runPromptAsync(const QString &prompt,
+QProcess *AbstractCli::runPromptAsync(const QString &prompt,
                                   QObject *context,
                                   std::function<void(CliRunResult)> callback) const
 {
-    runPromptAsync(prompt, {}, context, std::move(callback));
+    return runPromptAsync(prompt, {}, context, std::move(callback));
 }
 
-void AbstractCli::runPromptAsync(const QString &prompt,
+QProcess *AbstractCli::runPromptAsync(const QString &prompt,
                                   const QString &workingDir,
                                   QObject *context,
                                   std::function<void(CliRunResult)> callback) const
 {
     auto ctx = std::make_shared<RunCtx>();
     if (!ctx->tempDir.isValid())
-        return;
+        return nullptr;
 
     const QString prepared = preparePrompt(prompt);
     const QString promptPath = ctx->tempDir.path() + QStringLiteral("/prompt.txt");
     QFile promptFile(promptPath);
     if (!promptFile.open(QIODevice::WriteOnly))
-        return;
+        return nullptr;
     promptFile.write(prepared.toUtf8());
     promptFile.close();
 
@@ -351,6 +474,7 @@ void AbstractCli::runPromptAsync(const QString &prompt,
     });
 
     process->start();
+    return process;
 }
 
 void AbstractCli::checkAvailabilityAsync(QObject *context,
