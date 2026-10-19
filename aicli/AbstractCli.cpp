@@ -20,6 +20,17 @@
 // Default virtuals
 // ---------------------------------------------------------------------------
 
+QString AbstractCli::getModel() const
+{
+    const QStringList args = promptArgs();
+    for (int i = 0; i < args.size() - 1; ++i) {
+        if (args.at(i) == QStringLiteral("--model")) {
+            return args.at(i + 1);
+        }
+    }
+    return {};
+}
+
 QStringList AbstractCli::promptArgs() const
 {
     return {QStringLiteral("-p"), QStringLiteral("-")};

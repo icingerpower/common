@@ -1,6 +1,9 @@
 #include "CliAntigravity.h"
 
 #include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 QString CliAntigravity::getName() const
 {
@@ -10,6 +13,26 @@ QString CliAntigravity::getName() const
 QString CliAntigravity::getDescription() const
 {
     return QStringLiteral("Antigravity AI CLI");
+}
+
+QString CliAntigravity::getModel() const
+{
+    const QString fromArgs = AbstractCli::getModel();
+    if (!fromArgs.isEmpty()) {
+        return fromArgs;
+    }
+    const QString settingsPath = QDir::homePath() + QStringLiteral("/.gemini/antigravity-cli/settings.json");
+    QFile f(settingsPath);
+    if (f.open(QIODevice::ReadOnly)) {
+        const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+        if (doc.isObject()) {
+            const QString model = doc.object().value(QStringLiteral("model")).toString();
+            if (!model.isEmpty()) {
+                return model;
+            }
+        }
+    }
+    return QStringLiteral("Gemini 3.8 Flash (Medium)");
 }
 
 bool CliAntigravity::canGenSvg() const { return true; }
@@ -67,14 +90,9 @@ QString CliAntigravity::preparePrompt(const QString &prompt) const
             "Generate the image now, save it to the file path specified in the instructions, then stop.\n\n")
             + prompt;
     }
-    // A WEB-SEARCH prompt (tagged with WEB_SEARCH_PROMPT_MARKER) is the one
-    // text prompt that MUST use a tool. Branching here — before the text branch
-    // below — is the whole reason that sentinel exists: the "Do NOT use any
-    // tools" preamble would otherwise instruct the model not to search, and the
-    // likely outcome is not an error but a plausible invented answer.
-    //
-    // ⚠️ The filesystem half of the anti-agentic instruction is KEPT: what this
-    // prompt wants is a search, never an exploration of the working directory.
+    // A WEB-SEARCH prompt requires a lookup and a structured JSON response.
+    // Keep its specialized instructions separate from ordinary text tasks,
+    // which may also use tools when their instructions require research.
     if (prompt.contains(QString::fromLatin1(WEB_SEARCH_PROMPT_MARKER))) {
         if (prompt.contains(QString::fromLatin1(PUBLIC_DATA_DOWNLOAD_PROMPT_MARKER))) {
             return QStringLiteral(
@@ -94,11 +112,10 @@ QString CliAntigravity::preparePrompt(const QString &prompt) const
             "as plain text — no prose, no explanation, no markdown fence.\n\n")
             + prompt;
     }
-    // Text prompt — prevent agentic filesystem exploration, output immediately.
+    // Text tasks may need research before answering; only constrain final output.
     return QStringLiteral(
-        "IMPORTANT: Output your response as plain text IMMEDIATELY. "
-        "Do NOT use any tools, list files, run shell commands, or explore the filesystem. "
-        "Start your response now.\n\n")
+        "IMPORTANT: Use tools when needed to fulfill the request. "
+        "When finished, output your response as plain text in the requested format.\n\n")
         + prompt;
 }
 

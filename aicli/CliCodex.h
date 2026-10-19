@@ -8,6 +8,7 @@ class CliCodex : public AbstractCli
 public:
     QString getName() const override;
     QString getDescription() const override;
+    QString getModel() const override;
     bool canGenSvg() const override;
     bool canGenImages() const override;
     bool canGenVideosFromText() const override;

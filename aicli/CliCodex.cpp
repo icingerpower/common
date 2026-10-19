@@ -1,5 +1,9 @@
 #include "CliCodex.h"
 
+#include <QDir>
+#include <QFile>
+#include <QRegularExpression>
+
 QString CliCodex::getName() const
 {
     return QStringLiteral("Codex");
@@ -8,6 +12,26 @@ QString CliCodex::getName() const
 QString CliCodex::getDescription() const
 {
     return QStringLiteral("OpenAI Codex CLI");
+}
+
+QString CliCodex::getModel() const
+{
+    const QString fromArgs = AbstractCli::getModel();
+    if (!fromArgs.isEmpty()) {
+        return fromArgs;
+    }
+    const QString configPath = QDir::homePath() + QStringLiteral("/.codex/config.toml");
+    QFile f(configPath);
+    if (f.open(QIODevice::ReadOnly)) {
+        const QString content = QString::fromUtf8(f.readAll());
+        static const QRegularExpression reModel(QStringLiteral(R"(^\s*model\s*=\s*["']([^"']+)["'])"),
+                                                QRegularExpression::MultilineOption);
+        const auto match = reModel.match(content);
+        if (match.hasMatch()) {
+            return match.captured(1);
+        }
+    }
+    return QStringLiteral("Codex");
 }
 
 bool CliCodex::canGenSvg() const { return true; }

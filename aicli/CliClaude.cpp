@@ -1,5 +1,7 @@
 #include "CliClaude.h"
 
+#include <QDir>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -12,6 +14,26 @@ QString CliClaude::getName() const
 QString CliClaude::getDescription() const
 {
     return QStringLiteral("Anthropic Claude Code CLI");
+}
+
+QString CliClaude::getModel() const
+{
+    const QString fromArgs = AbstractCli::getModel();
+    if (!fromArgs.isEmpty()) {
+        return fromArgs;
+    }
+    const QString settingsPath = QDir::homePath() + QStringLiteral("/.claude/settings.json");
+    QFile f(settingsPath);
+    if (f.open(QIODevice::ReadOnly)) {
+        const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+        if (doc.isObject()) {
+            const QString model = doc.object().value(QStringLiteral("model")).toString();
+            if (!model.isEmpty()) {
+                return model;
+            }
+        }
+    }
+    return QStringLiteral("Claude");
 }
 
 bool CliClaude::canGenSvg() const { return true; }

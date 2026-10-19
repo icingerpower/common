@@ -56,24 +56,17 @@ enum class CliErrorKind {
 static constexpr const char *RASTER_IMAGE_PROMPT_MARKER = "Task type         : RASTER_IMAGE_GENERATION";
 
 // Marker line that a WEB-SEARCH prompt includes so CLI-specific preparePrompt()
-// overrides can detect "this prompt REQUIRES the model's web-search tool" and
-// must therefore NOT receive an anti-tool preamble.
-//
-// ⚠️ THIS EXISTS BECAUSE THE OPPOSITE DEFAULT IS ALREADY IN PLACE AND WOULD
-// SILENTLY DEFEAT SUCH A PROMPT. CliAntigravity::preparePrompt() prepends
-// "Do NOT use any tools, list files, run shell commands, or explore the
-// filesystem" to EVERY plain-text prompt. Routed through that unchanged, a
-// web-search request arrives with an explicit instruction not to search — and
-// the likely outcome is not an error but a plausible INVENTED answer, i.e. a
-// failure that produces no error at all. Same sentinel shape, same reason, as
-// RASTER_IMAGE_PROMPT_MARKER above.
+// overrides can require a web lookup and a structured JSON response. Ordinary
+// text prompts may also use research tools, but do not receive these specialized
+// lookup and output instructions.
 //
 // Keep this literal in sync between the prompt builder and every
 // preparePrompt() override that checks for it.
 static constexpr const char *WEB_SEARCH_PROMPT_MARKER = "Task type         : WEB_SEARCH_LOOKUP";
 
 // Explicit opt-in for historical/public-data download tasks. Generic web
-// searches and text/image prompts retain their existing tool restrictions.
+// searches retain their specialized tool restrictions; ordinary text prompts
+// may use tools as needed to fulfill their task.
 static constexpr const char *PUBLIC_DATA_DOWNLOAD_PROMPT_MARKER = "Task capability   : PUBLIC_DATA_DOWNLOAD";
 
 // Base class for AI command-line tools (Claude, Gemini, Codex, …).
@@ -97,6 +90,10 @@ public:
 
     virtual QString getName() const = 0;
     virtual QString getDescription() const = 0;
+
+    // Model name or identifier used by this CLI (e.g. "Gemini 3.8 Flash (Medium)").
+    // Empty if unknown.
+    virtual QString getModel() const;
 
     // Whether this CLI can generate SVG markup.
     virtual bool canGenSvg() const = 0;
