@@ -14,7 +14,7 @@ QStringList CliAntigravityClaude::promptArgs() const
 {
     return CliAntigravity::promptArgs()
            << QStringLiteral("--model")
-           << QStringLiteral("Claude Sonnet 4.6 (Thinking)");
+           << QStringLiteral("Claude Sonnet 5.5 (Medium)");
 }
 
 DECLARE_CLI(CliAntigravityClaude)

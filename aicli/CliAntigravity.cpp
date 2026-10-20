@@ -5,18 +5,36 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
+CliAntigravity::CliAntigravity(QString modelName, QString displayName)
+    : m_modelName(std::move(modelName))
+    , m_displayName(std::move(displayName))
+{
+}
+
 QString CliAntigravity::getName() const
 {
+    if (!m_displayName.isEmpty()) {
+        return m_displayName;
+    }
+    if (!m_modelName.isEmpty()) {
+        return QStringLiteral("Antigravity - ") + m_modelName;
+    }
     return QStringLiteral("Antigravity");
 }
 
 QString CliAntigravity::getDescription() const
 {
+    if (!m_modelName.isEmpty()) {
+        return QStringLiteral("Antigravity AI CLI (%1)").arg(m_modelName);
+    }
     return QStringLiteral("Antigravity AI CLI");
 }
 
 QString CliAntigravity::getModel() const
 {
+    if (!m_modelName.isEmpty()) {
+        return m_modelName;
+    }
     const QString fromArgs = AbstractCli::getModel();
     if (!fromArgs.isEmpty()) {
         return fromArgs;
@@ -57,13 +75,17 @@ QStringList CliAntigravity::promptArgs() const
     // never blocks on a confirmation prompt.
     // --print-timeout 20m: the default 5 min is too short when the model needs
     // to view several reference images before generating output.
-    return {
+    QStringList args{
         QStringLiteral("--print"),
         QStringLiteral("-"),
         QStringLiteral("--dangerously-skip-permissions"),
         QStringLiteral("--print-timeout"),
         QStringLiteral("20m"),
     };
+    if (!m_modelName.isEmpty()) {
+        args << QStringLiteral("--model") << m_modelName;
+    }
+    return args;
 }
 
 bool CliAntigravity::promptViaStdin() const
@@ -159,3 +181,24 @@ QStringList CliAntigravity::outputFallbackDirs() const
 }
 
 DECLARE_CLI(CliAntigravity)
+
+namespace {
+#define DECLARE_ANTIGRAVITY_MODEL(varSuffix, modelStr) \
+    CliAntigravity instanceCliAntigravity_##varSuffix(QStringLiteral(modelStr)); \
+    AbstractCli::Recorder recorderCliAntigravity_##varSuffix(&instanceCliAntigravity_##varSuffix);
+
+DECLARE_ANTIGRAVITY_MODEL(GeminiFlashLow,    "Gemini 3.8 Flash (Low)")
+DECLARE_ANTIGRAVITY_MODEL(GeminiFlashMedium, "Gemini 3.8 Flash (Medium)")
+DECLARE_ANTIGRAVITY_MODEL(GeminiFlashHigh,   "Gemini 3.8 Flash (High)")
+DECLARE_ANTIGRAVITY_MODEL(GeminiArgonLow,    "Gemini 4 Argon (Low)")
+DECLARE_ANTIGRAVITY_MODEL(GeminiArgonMedium, "Gemini 4 Argon (Medium)")
+DECLARE_ANTIGRAVITY_MODEL(GeminiArgonHigh,   "Gemini 4 Argon (High)")
+DECLARE_ANTIGRAVITY_MODEL(ClaudeSonnetLow,   "Claude Sonnet 5.5 (Low)")
+DECLARE_ANTIGRAVITY_MODEL(ClaudeSonnetMed,   "Claude Sonnet 5.5 (Medium)")
+DECLARE_ANTIGRAVITY_MODEL(ClaudeSonnetHigh,  "Claude Sonnet 5.5 (High)")
+DECLARE_ANTIGRAVITY_MODEL(ClaudeOpusLow,     "Claude Opus 5.5 (Low)")
+DECLARE_ANTIGRAVITY_MODEL(ClaudeOpusMed,     "Claude Opus 5.5 (Medium)")
+DECLARE_ANTIGRAVITY_MODEL(ClaudeOpusHigh,    "Claude Opus 5.5 (High)")
+
+#undef DECLARE_ANTIGRAVITY_MODEL
+} // namespace

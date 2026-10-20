@@ -6,6 +6,8 @@
 class CliAntigravity : public AbstractCli
 {
 public:
+    explicit CliAntigravity(QString modelName = {}, QString displayName = {});
+
     QString getName() const override;
     QString getDescription() const override;
     QString getModel() const override;
@@ -25,6 +27,10 @@ public:
     QString preparePrompt(const QString &prompt) const override;
     CliErrorKind classifyError(const QString &errorOutput) const override;
     QStringList outputFallbackDirs() const override;
+
+private:
+    QString m_modelName;
+    QString m_displayName;
 };
 
 #endif // CLIANTIGRAVITY_H
