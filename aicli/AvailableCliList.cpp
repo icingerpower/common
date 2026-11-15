@@ -8,6 +8,12 @@ AvailableCliList::AvailableCliList(AvailableCliTable *source, QObject *parent)
 {
     connect(m_source, &QAbstractItemModel::dataChanged,
             this, &AvailableCliList::_onSourceDataChanged);
+    connect(m_source, &QAbstractItemModel::rowsInserted,
+            this, &AvailableCliList::_onSourceRowsInserted);
+    connect(m_source, &QAbstractItemModel::rowsRemoved,
+            this, &AvailableCliList::_onSourceRowsRemoved);
+    connect(m_source, &QAbstractItemModel::modelReset,
+            this, &AvailableCliList::_onSourceModelReset);
 
     // Populate the initial filtered list (likely empty since checks are async).
     for (int r = 0; r < m_source->rowCount(); ++r) {
@@ -54,6 +60,81 @@ void AvailableCliList::_onSourceDataChanged(const QModelIndex &topLeft,
         }
         // wasAvail && nowAvail: name/description can't change, nothing to emit.
     }
+}
+
+void AvailableCliList::_onSourceRowsInserted(const QModelIndex &parent, int first, int last)
+{
+    if (parent.isValid() || first > last) {
+        return;
+    }
+
+    const int count = last - first + 1;
+    for (int &sr : m_sourceRows) {
+        if (sr >= first) {
+            sr += count;
+        }
+    }
+
+    for (int sr = first; sr <= last; ++sr) {
+        if (!_isAvailable(sr)) {
+            continue;
+        }
+        int insertAt = 0;
+        while (insertAt < m_sourceRows.size() && m_sourceRows[insertAt] < sr) {
+            ++insertAt;
+        }
+        beginInsertRows({}, insertAt, insertAt);
+        m_sourceRows.insert(insertAt, sr);
+        endInsertRows();
+    }
+}
+
+void AvailableCliList::_onSourceRowsRemoved(const QModelIndex &parent, int first, int last)
+{
+    if (parent.isValid() || first > last) {
+        return;
+    }
+
+    const int count = last - first + 1;
+    int removeStart = -1;
+    int removeEnd   = -1;
+    for (int i = 0; i < m_sourceRows.size(); ++i) {
+        if (m_sourceRows[i] >= first && m_sourceRows[i] <= last) {
+            if (removeStart < 0) {
+                removeStart = i;
+            }
+            removeEnd = i;
+        }
+    }
+
+    if (removeStart >= 0) {
+        beginRemoveRows({}, removeStart, removeEnd);
+        m_sourceRows.remove(removeStart, removeEnd - removeStart + 1);
+        for (int &sr : m_sourceRows) {
+            if (sr > last) {
+                sr -= count;
+            }
+        }
+        endRemoveRows();
+    } else {
+        for (int &sr : m_sourceRows) {
+            if (sr > last) {
+                sr -= count;
+            }
+        }
+    }
+}
+
+void AvailableCliList::_onSourceModelReset()
+{
+    beginResetModel();
+    m_sourceRows.clear();
+    for (int r = 0; r < m_source->rowCount(); ++r) {
+        if (_isAvailable(r)) {
+            m_sourceRows.append(r);
+        }
+    }
+    endResetModel();
 }
 
 AbstractCli *AvailableCliList::cliAt(int row) const

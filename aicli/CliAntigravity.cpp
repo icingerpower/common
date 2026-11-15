@@ -2,8 +2,16 @@
 
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
+#include <QHash>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPointer>
+#include <QProcess>
+#include <QSaveFile>
+#include <QStandardPaths>
+#include <QTimer>
 
 CliAntigravity::CliAntigravity(QString modelName, QString displayName)
     : m_modelName(std::move(modelName))
@@ -183,22 +191,331 @@ QStringList CliAntigravity::outputFallbackDirs() const
 DECLARE_CLI(CliAntigravity)
 
 namespace {
-#define DECLARE_ANTIGRAVITY_MODEL(varSuffix, modelStr) \
-    CliAntigravity instanceCliAntigravity_##varSuffix(QStringLiteral(modelStr)); \
-    AbstractCli::Recorder recorderCliAntigravity_##varSuffix(&instanceCliAntigravity_##varSuffix);
 
-DECLARE_ANTIGRAVITY_MODEL(GeminiFlashLow,    "Gemini 3.8 Flash (Low)")
-DECLARE_ANTIGRAVITY_MODEL(GeminiFlashMedium, "Gemini 3.8 Flash (Medium)")
-DECLARE_ANTIGRAVITY_MODEL(GeminiFlashHigh,   "Gemini 3.8 Flash (High)")
-DECLARE_ANTIGRAVITY_MODEL(GeminiArgonLow,    "Gemini 4 Argon (Low)")
-DECLARE_ANTIGRAVITY_MODEL(GeminiArgonMedium, "Gemini 4 Argon (Medium)")
-DECLARE_ANTIGRAVITY_MODEL(GeminiArgonHigh,   "Gemini 4 Argon (High)")
-DECLARE_ANTIGRAVITY_MODEL(ClaudeSonnetLow,   "Claude Sonnet 5.5 (Low)")
-DECLARE_ANTIGRAVITY_MODEL(ClaudeSonnetMed,   "Claude Sonnet 5.5 (Medium)")
-DECLARE_ANTIGRAVITY_MODEL(ClaudeSonnetHigh,  "Claude Sonnet 5.5 (High)")
-DECLARE_ANTIGRAVITY_MODEL(ClaudeOpusLow,     "Claude Opus 5.5 (Low)")
-DECLARE_ANTIGRAVITY_MODEL(ClaudeOpusMed,     "Claude Opus 5.5 (Medium)")
-DECLARE_ANTIGRAVITY_MODEL(ClaudeOpusHigh,    "Claude Opus 5.5 (High)")
+bool isModelIdSlug(const QString &token)
+{
+    if (token.isEmpty()) {
+        return false;
+    }
+    const QChar first = token.at(0);
+    if (!((first >= QLatin1Char('a') && first <= QLatin1Char('z'))
+          || (first >= QLatin1Char('0') && first <= QLatin1Char('9')))) {
+        return false;
+    }
+    for (const QChar ch : token) {
+        const bool ok = (ch >= QLatin1Char('a') && ch <= QLatin1Char('z'))
+                        || (ch >= QLatin1Char('0') && ch <= QLatin1Char('9'))
+                        || ch == QLatin1Char('-')
+                        || ch == QLatin1Char('.')
+                        || ch == QLatin1Char('_');
+        if (!ok) {
+            return false;
+        }
+    }
+    return true;
+}
 
-#undef DECLARE_ANTIGRAVITY_MODEL
+QString modelsCacheFilePath()
+{
+    QString base = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation);
+    if (base.isEmpty()) {
+        base = QDir::homePath() + QStringLiteral("/.cache");
+    }
+    return base + QStringLiteral("/aicli/antigravity_models.json");
+}
+
+QStringList loadCachedModels()
+{
+    QFile f(modelsCacheFilePath());
+    if (!f.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+    if (!doc.isObject()) {
+        return {};
+    }
+    const QJsonArray arr = doc.object().value(QStringLiteral("models")).toArray();
+    QStringList models;
+    models.reserve(arr.size());
+    for (const QJsonValue &val : arr) {
+        const QString name = val.toString().trimmed();
+        if (!name.isEmpty() && !models.contains(name)) {
+            models.append(name);
+        }
+    }
+    return models;
+}
+
+void saveCachedModels(const QStringList &models)
+{
+    if (models.isEmpty()) {
+        return;
+    }
+    const QString path = modelsCacheFilePath();
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QSaveFile f(path);
+    if (!f.open(QIODevice::WriteOnly)) {
+        return;
+    }
+    QJsonArray arr;
+    for (const QString &m : models) {
+        arr.append(m);
+    }
+    QJsonObject root;
+    root.insert(QStringLiteral("models"), arr);
+    f.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
+    f.commit();
+}
+
+QStringList fallbackModels()
+{
+    return {
+        QStringLiteral("Gemini 3.8 Flash (Low)"),
+        QStringLiteral("Gemini 3.8 Flash (Medium)"),
+        QStringLiteral("Gemini 3.8 Flash (High)"),
+        QStringLiteral("Gemini 4 Argon (Low)"),
+        QStringLiteral("Gemini 4 Argon (Medium)"),
+        QStringLiteral("Gemini 4 Argon (High)"),
+        QStringLiteral("Claude Sonnet 5.5 (Low)"),
+        QStringLiteral("Claude Sonnet 5.5 (Medium)"),
+        QStringLiteral("Claude Sonnet 5.5 (High)"),
+        QStringLiteral("Claude Opus 5.5 (Low)"),
+        QStringLiteral("Claude Opus 5.5 (Medium)"),
+        QStringLiteral("Claude Opus 5.5 (High)"),
+    };
+}
+
+// Never delete allocated CliAntigravity instances so any AbstractCli* handed to
+// callers remains valid for the lifetime of the process even if `agy models`
+// later removes a deprecated model from the active list.
+QHash<QString, CliAntigravity *> &modelInstancePool()
+{
+    static QHash<QString, CliAntigravity *> pool;
+    return pool;
+}
+
+struct PendingRefreshListener {
+    QPointer<QObject> guard;
+    std::function<void(bool)> callback;
+};
+
+struct AsyncRefreshState {
+    bool inFlight = false;
+    QList<PendingRefreshListener> listeners;
+};
+
+AsyncRefreshState &asyncRefreshState()
+{
+    static AsyncRefreshState state;
+    return state;
+}
+
 } // namespace
+
+QStringList CliAntigravity::parseModelsOutput(const QString &stdoutText)
+{
+    QStringList models;
+    const QStringList rawLines = stdoutText.split(QLatin1Char('\n'));
+    for (QString line : rawLines) {
+        if (line.endsWith(QLatin1Char('\r'))) {
+            line.chop(1);
+        }
+        // Strip any carriage-return spinner updates if stderr/stdout were merged.
+        const int lastCr = line.lastIndexOf(QLatin1Char('\r'));
+        if (lastCr >= 0) {
+            line = line.mid(lastCr + 1);
+        }
+        line = line.trimmed();
+        if (line.isEmpty()) {
+            continue;
+        }
+
+        int ws = -1;
+        for (int i = 0; i < line.size(); ++i) {
+            if (line.at(i) == QLatin1Char('\t') || line.at(i) == QLatin1Char(' ')) {
+                ws = i;
+                break;
+            }
+        }
+        if (ws <= 0) {
+            continue;
+        }
+
+        const QString id = line.left(ws);
+        if (!isModelIdSlug(id)) {
+            continue;
+        }
+
+        const QString displayName = line.mid(ws + 1).trimmed();
+        if (!displayName.isEmpty() && !models.contains(displayName)) {
+            models.append(displayName);
+        }
+    }
+    return models;
+}
+
+void CliAntigravity::applyModelNames(const QStringList &modelNames)
+{
+    auto &pool = modelInstancePool();
+    QList<AbstractCli *> children;
+    children.reserve(modelNames.size());
+    for (const QString &raw : modelNames) {
+        const QString name = raw.trimmed();
+        if (name.isEmpty()) {
+            continue;
+        }
+        CliAntigravity *cli = pool.value(name, nullptr);
+        if (!cli) {
+            cli = new CliAntigravity(name);
+            pool.insert(name, cli);
+        }
+        if (!children.contains(cli)) {
+            children.append(cli);
+        }
+    }
+    AbstractCli::replaceDynamicChildren(&instanceCliAntigravity, children);
+}
+
+void CliAntigravity::ensureInitialModelsLoaded()
+{
+    const QStringList cached = loadCachedModels();
+    applyModelNames(cached.isEmpty() ? fallbackModels() : cached);
+}
+
+bool CliAntigravity::resolveModelByCliName(const QString &nameOrExecutable)
+{
+    static const QString prefix = QStringLiteral("Antigravity - ");
+    if (!nameOrExecutable.startsWith(prefix, Qt::CaseInsensitive)) {
+        return false;
+    }
+    // Query `agy models` at most once per headless lookup miss.
+    static bool attemptedSyncDiscovery = false;
+    if (attemptedSyncDiscovery) {
+        return false;
+    }
+    attemptedSyncDiscovery = true;
+    return discoverModelsSync();
+}
+
+bool CliAntigravity::discoverModelsSync(int timeoutMs)
+{
+    if (!instanceCliAntigravity.isInstalled()) {
+        return false;
+    }
+
+    QProcess process;
+    instanceCliAntigravity.configureExecutableProcess(&process);
+    process.setArguments({QStringLiteral("models")});
+    process.setStandardInputFile(QProcess::nullDevice());
+    process.start();
+
+    if (!process.waitForStarted(timeoutMs)) {
+        return false;
+    }
+    if (!process.waitForFinished(timeoutMs)) {
+        process.kill();
+        process.waitForFinished(1000);
+        return false;
+    }
+    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        return false;
+    }
+
+    const QStringList models =
+        parseModelsOutput(QString::fromUtf8(process.readAllStandardOutput()));
+    if (models.isEmpty()) {
+        return false;
+    }
+
+    applyModelNames(models);
+    saveCachedModels(models);
+    return true;
+}
+
+void CliAntigravity::refreshModelsAsync(QObject *context,
+                                        std::function<void(bool liveSuccess)> callback)
+{
+    // Ensure ALL_CLIS() has at least loaded cached/fallback entries first.
+    (void)AbstractCli::ALL_CLIS();
+
+    auto &state = asyncRefreshState();
+    if (callback) {
+        state.listeners.append({QPointer<QObject>(context), std::move(callback)});
+    }
+    if (state.inFlight) {
+        return;
+    }
+    state.inFlight = true;
+
+    auto finish = [](bool liveSuccess) {
+        auto &st = asyncRefreshState();
+        st.inFlight = false;
+        const QList<PendingRefreshListener> listeners = std::move(st.listeners);
+        st.listeners.clear();
+        for (const PendingRefreshListener &listener : listeners) {
+            if (listener.guard && listener.callback) {
+                listener.callback(liveSuccess);
+            }
+        }
+    };
+
+    auto *process = new QProcess();
+    instanceCliAntigravity.configureExecutableProcess(process);
+    process->setStandardInputFile(QProcess::nullDevice());
+
+    auto fired = std::make_shared<bool>(false);
+
+    QObject::connect(process, &QProcess::finished,
+                     process, [process, fired, finish](int exitCode, QProcess::ExitStatus exitStatus) {
+        if (*fired) {
+            return;
+        }
+        *fired = true;
+
+        bool liveSuccess = false;
+        if (process->error() != QProcess::FailedToStart
+            && exitStatus == QProcess::NormalExit
+            && exitCode == 0) {
+            const QStringList models =
+                CliAntigravity::parseModelsOutput(QString::fromUtf8(process->readAllStandardOutput()));
+            if (!models.isEmpty()) {
+                CliAntigravity::applyModelNames(models);
+                saveCachedModels(models);
+                liveSuccess = true;
+            }
+        }
+        finish(liveSuccess);
+        process->deleteLater();
+    });
+
+    QObject::connect(process, &QProcess::errorOccurred,
+                     process, [process, fired, finish](QProcess::ProcessError error) {
+        if (error != QProcess::FailedToStart || *fired) {
+            return;
+        }
+        *fired = true;
+        finish(false);
+        process->deleteLater();
+    });
+
+    // 15 s timeout: `agy models` performs a network request; guard against hangs.
+    auto *timeout = new QTimer(process);
+    timeout->setSingleShot(true);
+    QObject::connect(timeout, &QTimer::timeout, process, [process]() { process->kill(); });
+    timeout->start(15000);
+
+    process->setArguments({QStringLiteral("models")});
+    process->start();
+}
+
+void CliAntigravity::setModelsForTesting(const QStringList &modelNames)
+{
+    (void)AbstractCli::ALL_CLIS();
+    applyModelNames(modelNames);
+}
+
+const bool CliAntigravity::s_hooksRegistered = []() {
+    AbstractCli::registerDynamicInitializer(&CliAntigravity::ensureInitialModelsLoaded);
+    AbstractCli::registerDynamicResolver(&CliAntigravity::resolveModelByCliName);
+    return true;
+}();

@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QHash>
 #include <QPointer>
 #include <QProcess>
 #include <QStandardPaths>
@@ -287,6 +288,11 @@ static void applyResolvedProgram(QProcess *process, const QString &execPath)
     }
 }
 
+void AbstractCli::configureExecutableProcess(QProcess *process) const
+{
+    applyResolvedProgram(process, resolveExecutable(getExecutable()));
+}
+
 QCoro::Task<CliRunResult> AbstractCli::runPrompt(const QString &prompt,
                                                    const QString &workingDir) const
 {
@@ -538,14 +544,129 @@ void AbstractCli::checkAvailabilityAsync(QObject *context,
 // Registry
 // ---------------------------------------------------------------------------
 
+namespace {
+
+QList<void (*)()> &getDynamicInitializers()
+{
+    static QList<void (*)()> list;
+    return list;
+}
+
+QList<bool (*)(const QString &)> &getDynamicResolvers()
+{
+    static QList<bool (*)(const QString &)> list;
+    return list;
+}
+
+QHash<AbstractCli *, QList<AbstractCli *>> &getDynamicChildrenMap()
+{
+    static QHash<AbstractCli *, QList<AbstractCli *>> map;
+    return map;
+}
+
+AbstractCli *scanClisByName(const QList<AbstractCli *> &clis, const QString &name)
+{
+    for (AbstractCli *cli : clis) {
+        if (cli->getName().compare(name, Qt::CaseInsensitive) == 0
+            || cli->getExecutable().compare(name, Qt::CaseInsensitive) == 0) {
+            return cli;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
+
 AbstractCli::Recorder::Recorder(AbstractCli *cli)
 {
     getClis().append(cli);
 }
 
+void AbstractCli::registerDynamicInitializer(void (*fn)())
+{
+    if (fn && !getDynamicInitializers().contains(fn)) {
+        getDynamicInitializers().append(fn);
+    }
+}
+
+void AbstractCli::registerDynamicResolver(bool (*fn)(const QString &))
+{
+    if (fn && !getDynamicResolvers().contains(fn)) {
+        getDynamicResolvers().append(fn);
+    }
+}
+
+void AbstractCli::replaceDynamicChildren(AbstractCli *anchor,
+                                         const QList<AbstractCli *> &children)
+{
+    if (!anchor) {
+        return;
+    }
+
+    QList<AbstractCli *> &clis = getClis();
+    auto &childrenMap = getDynamicChildrenMap();
+
+    const QList<AbstractCli *> previous = childrenMap.value(anchor);
+    for (AbstractCli *oldChild : previous) {
+        clis.removeAll(oldChild);
+    }
+
+    // Also avoid duplicating any child already present in the list.
+    QList<AbstractCli *> deduped;
+    deduped.reserve(children.size());
+    for (AbstractCli *child : children) {
+        if (child && child != anchor && !clis.contains(child) && !deduped.contains(child)) {
+            deduped.append(child);
+        }
+    }
+
+    int insertPos = clis.indexOf(anchor);
+    insertPos = (insertPos >= 0) ? (insertPos + 1) : clis.size();
+    for (AbstractCli *child : deduped) {
+        clis.insert(insertPos++, child);
+    }
+
+    childrenMap.insert(anchor, deduped);
+}
+
 const QList<AbstractCli *> &AbstractCli::ALL_CLIS()
 {
+    static bool initialized = false;
+    if (!initialized) {
+        initialized = true;
+        const auto initializers = getDynamicInitializers();
+        for (auto fn : initializers) {
+            fn();
+        }
+    }
     return getClis();
+}
+
+AbstractCli *AbstractCli::findByName(const QString &nameOrExecutable,
+                                     bool allowLiveDiscovery)
+{
+    if (nameOrExecutable.isEmpty()) {
+        return nullptr;
+    }
+
+    if (AbstractCli *found = scanClisByName(ALL_CLIS(), nameOrExecutable)) {
+        return found;
+    }
+
+    if (allowLiveDiscovery) {
+        bool anyUpdated = false;
+        const auto resolvers = getDynamicResolvers();
+        for (auto resolver : resolvers) {
+            if (resolver(nameOrExecutable)) {
+                anyUpdated = true;
+            }
+        }
+        if (anyUpdated) {
+            return scanClisByName(ALL_CLIS(), nameOrExecutable);
+        }
+    }
+
+    return nullptr;
 }
 
 QList<AbstractCli *> &AbstractCli::getClis()

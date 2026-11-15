@@ -272,12 +272,35 @@ public:
 
     static const QList<AbstractCli *> &ALL_CLIS();
 
+    // Look up a registered CLI by display name or executable (case-insensitive).
+    // When allowLiveDiscovery is true and the initial registry scan misses,
+    // registered dynamic model resolvers (such as `agy models` for
+    // "Antigravity - <model>") are queried once before returning nullptr.
+    static AbstractCli *findByName(const QString &nameOrExecutable,
+                                   bool allowLiveDiscovery = true);
+
+    // Replace the dynamic child CLIs positioned immediately after `anchor` in
+    // ALL_CLIS() (used by CLIs such as CliAntigravity that discover model
+    // variants dynamically).
+    static void replaceDynamicChildren(AbstractCli *anchor,
+                                       const QList<AbstractCli *> &children);
+
+    // Register hooks for CLIs that populate dynamic entries lazily on first
+    // ALL_CLIS() access or on-demand during findByName().
+    static void registerDynamicInitializer(void (*fn)());
+    static void registerDynamicResolver(bool (*fn)(const QString &nameOrExecutable));
+
     // Used by DECLARE_CLI to register a subclass instance at startup.
     class Recorder
     {
     public:
         explicit Recorder(AbstractCli *cli);
     };
+
+protected:
+    // Resolve getExecutable() and configure `process` (including PATH injection
+    // when resolved from user-local directories outside the current PATH).
+    void configureExecutableProcess(QProcess *process) const;
 
 private:
     static QList<AbstractCli *> &getClis();

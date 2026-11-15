@@ -30,6 +30,9 @@ public:
 private:
     void _onSourceDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight,
                               const QList<int> &roles);
+    void _onSourceRowsInserted(const QModelIndex &parent, int first, int last);
+    void _onSourceRowsRemoved(const QModelIndex &parent, int first, int last);
+    void _onSourceModelReset();
     bool _isAvailable(int sourceRow) const;
 
     AvailableCliTable *m_source;

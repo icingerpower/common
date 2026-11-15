@@ -2,7 +2,9 @@
 #define AVAILABLECLITABLE_H
 
 #include <QAbstractTableModel>
+#include <QHash>
 #include <QList>
+#include <QSet>
 
 #include "AbstractCli.h"
 
@@ -34,6 +36,10 @@ public:
     // Restart availability checks for all rows (useful for a "Refresh" button).
     void refresh();
 
+    // Synchronize rows with AbstractCli::ALL_CLIS() using incremental
+    // rowsRemoved / rowsInserted signals (preserving selection in views).
+    void syncWithRegistry(bool antigravityLiveSuccess = false);
+
     // Returns the CLI for the given row, or nullptr if row is out of range.
     AbstractCli *cliAt(int row) const;
 
@@ -53,9 +59,13 @@ private:
         QString      membership;
     };
 
-    void _startCheck(int row);
+    void _ensureExecCheckStarted(AbstractCli *cli, quint64 generation);
+    static QString _execCheckKey(const AbstractCli *cli);
 
-    QList<RowData> m_rows;
+    QList<RowData>                   m_rows;
+    quint64                          m_refreshGeneration = 0;
+    QSet<QString>                    m_inFlightExecKeys;
+    QHash<QString, CliAvailability>  m_resolvedExecAvail;
 };
 
 #endif // AVAILABLECLITABLE_H
